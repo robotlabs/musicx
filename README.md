@@ -24,19 +24,32 @@ npm run build
 
 `http://localhost:5173/?fake` apre l'app con un pCloud finto (libreria inventata, brani sintetici,
 playlist in memoria): serve per lavorare sull'interfaccia senza account. `?fake=30` fa brani da 30
-secondi. Il codice finto non entra nella build di produzione.
+secondi. `?fake&login` parte dalla schermata di accesso (codice giusto `123456`; email che
+iniziano con `2fa`, `sms` o `mail` provano le verifiche, password `sbagliata` l'errore). Il codice
+finto non entra nella build di produzione.
 
-## Configurazione pCloud (una volta sola)
+## Accesso a pCloud
+
+Due modi, una volta per dispositivo:
+
+- **Email e password**: vanno solo a pCloud (`userinfo` con `getauth`), che restituisce un token di
+  sessione. Se pCloud chiede un codice (2FA o conferma di un dispositivo nuovo via email) l'app lo
+  chiede a sua volta; questi passi non sono documentati da pCloud e seguono
+  [go-pcloud](https://github.com/StarHack/go-pcloud). Funziona senza nessuna app registrata.
+- **OAuth** ("Accedi con pCloud"): compare quando `PCLOUD_CLIENT_ID` è impostato. Diventa il pulsante
+  principale e email e password restano come riserva.
+
+Configurare OAuth (una volta sola):
 
 1. Su <https://docs.pcloud.com/my_apps/> crea un'app con accesso a **tutto** il drive (non solo
-   alla cartella dell'app).
+   alla cartella dell'app). pCloud deve approvarla.
 2. Redirect URI da registrare: `https://robotlabs.github.io/musicx/` e, per lo sviluppo,
    `http://localhost:5173/`.
 3. Scrivi il Client ID in `src/config.ts` (`PCLOUD_CLIENT_ID`). È pubblico per costruzione: il
    flusso OAuth "token" non usa segreti.
 
 Il token resta solo nel browser del dispositivo (localStorage). "Esci da pCloud" nel menu ⋯ lo
-cancella.
+cancella e, per quello di sessione, lo invalida anche su pCloud.
 
 ## Pubblicazione
 
@@ -52,7 +65,8 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 
 ## Struttura
 
-- `src/lib/pcloud.ts` – chiamate all'API pCloud (unico punto di contatto con la rete)
+- `src/lib/pcloud.ts` – chiamate all'API pCloud
+- `src/lib/auth.ts`, `src/lib/passwordLogin.ts` – accesso OAuth e con email e password
 - `src/lib/library.ts` – indice della libreria, ricerca, cache in IndexedDB
 - `src/lib/player.ts` – elemento audio, coda, Media Session, tentativi di recupero
 - `src/lib/queue.ts` – logica della coda (pura, testata)

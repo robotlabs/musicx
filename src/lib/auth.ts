@@ -5,6 +5,11 @@ export interface Auth {
   token: string
   /** Server API dell'account: eapi.pcloud.com (Europa) o api.pcloud.com (USA). */
   host: string
+  /**
+   * Da dove viene il token: `oauth` (app pCloud approvata, parametro `access_token`)
+   * o `session` (accesso con email e password, parametro `auth`).
+   */
+  kind: 'oauth' | 'session'
 }
 
 interface AuthState {
@@ -20,13 +25,22 @@ const API_HOSTS = new Set(['api.pcloud.com', 'eapi.pcloud.com'])
 function loadAuth(): Auth | null {
   try {
     const saved = JSON.parse(localStorage.getItem(AUTH_KEY) ?? 'null')
-    return saved && typeof saved.token === 'string' && API_HOSTS.has(saved.host) ? saved : null
+    if (!saved || typeof saved.token !== 'string' || !API_HOSTS.has(saved.host)) return null
+    return { token: saved.token, host: saved.host, kind: saved.kind === 'session' ? 'session' : 'oauth' }
   } catch {
     return null
   }
 }
 
 export const authStore = createStore<AuthState>({ auth: loadAuth(), notice: null })
+
+/** Nella modalità finta di sviluppo la sessione non si salva, per non toccare quella vera. */
+let memoryOnly = false
+
+export function saveAuth(auth: Auth) {
+  if (!memoryOnly) localStorage.setItem(AUTH_KEY, JSON.stringify(auth))
+  authStore.set({ auth, notice: null })
+}
 
 /** L'indirizzo a cui pCloud rimanda dopo l'accesso: va registrato identico nell'app pCloud. */
 export const redirectUri = () => location.origin + location.pathname.replace(/index\.html$/, '')
@@ -68,20 +82,19 @@ export function consumeLoginRedirect() {
     authStore.set({ auth: null, notice: 'Accesso non riuscito, riprova.' })
     return
   }
-  const auth = { token, host }
-  localStorage.setItem(AUTH_KEY, JSON.stringify(auth))
-  authStore.set({ auth, notice: null })
+  saveAuth({ token, host, kind: 'oauth' })
 }
 
 export function clearAuth(notice: string | null = null) {
-  localStorage.removeItem(AUTH_KEY)
+  if (!memoryOnly) localStorage.removeItem(AUTH_KEY)
   authStore.set({ auth: null, notice })
 }
 
 /** pCloud ha rifiutato il token (scaduto o revocato). */
 export const expireAuth = () => clearAuth('La sessione pCloud è scaduta: accedi di nuovo.')
 
-/** Solo per la modalità finta di sviluppo: sessione in memoria, mai salvata. */
-export function setMemoryAuth(auth: Auth) {
+/** Solo per la modalità finta di sviluppo: sessione in memoria (o nessuna), mai salvata. */
+export function setMemoryAuth(auth: Auth | null) {
+  memoryOnly = true
   authStore.set({ auth, notice: null })
 }

@@ -28,7 +28,7 @@ const httpTransport: Transport = async (method, params, timeoutMs) => {
     if (value !== undefined) query.set(name, String(value))
   }
   // Il token va nei parametri e non in un header: l'API non ammette header extra via CORS.
-  query.set('access_token', auth.token)
+  query.set(auth.kind === 'session' ? 'auth' : 'access_token', auth.token)
 
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), timeoutMs)
@@ -116,6 +116,12 @@ export async function audioLink(fileid: number, kbps = 256): Promise<string> {
 
 export async function accountEmail(): Promise<string> {
   return (await call<{ email: string }>('userinfo')).email
+}
+
+/** Invalida su pCloud il token di un accesso con password. Quello OAuth si revoca dalle impostazioni di pCloud. */
+export async function endSession(): Promise<void> {
+  if (authStore.get().auth?.kind !== 'session') return
+  await call('logout', {}, 5_000).catch(() => {})
 }
 
 // --- Playlist: sono le "collection" native di pCloud, le stesse dell'app ufficiale. ---

@@ -12,11 +12,13 @@ function App() {
 }
 
 async function start() {
-  // Solo in sviluppo: con ?fake (o ?fake=20 per brani da 20 secondi) si usa un pCloud finto.
-  const fake = new URLSearchParams(location.search).get('fake')
+  // Solo in sviluppo: con ?fake (o ?fake=20 per brani da 20 secondi) si usa un pCloud finto;
+  // con ?fake&login si parte dalla schermata di accesso.
+  const search = new URLSearchParams(location.search)
+  const fake = search.get('fake')
   if (import.meta.env.DEV && fake !== null) {
     const { installFake } = await import('./lib/fake')
-    installFake(Number(fake) || undefined)
+    installFake(Number(fake) || undefined, !search.has('login'))
   } else {
     consumeLoginRedirect()
   }

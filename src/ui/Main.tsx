@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { MUSIC_ROOT } from '../config'
 import { clearAuth } from '../lib/auth'
 import { clearLibrary, initLibrary, libraryStore, refreshLibrary } from '../lib/library'
-import { accountEmail } from '../lib/pcloud'
+import { accountEmail, endSession } from '../lib/pcloud'
 import { initPlayer, playerStore, resetPlayer, toggle } from '../lib/player'
 import { playlistsStore, refreshPlaylists, resetPlaylists } from '../lib/playlists'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
@@ -23,6 +23,7 @@ async function logout() {
   resetPlayer()
   resetPlaylists()
   await clearLibrary()
+  await endSession()
   clearAuth()
 }
 

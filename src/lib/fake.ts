@@ -3,6 +3,7 @@
 
 import { setMemoryAuth } from './auth'
 import { setNamespace } from './env'
+import { setLoginTransport } from './passwordLogin'
 import { PCloudError, setTransport, type Params, type RawMeta } from './pcloud'
 
 let nextFolderId = 100
@@ -124,14 +125,48 @@ function link(fileid: number, transcoded: boolean, seconds: number) {
   return { result: 0, hosts: ['fake'], path: '/', url }
 }
 
-export function installFake(trackSeconds = 6) {
+/**
+ * Accesso finto con email e password. Il codice giusto è sempre 123456.
+ * - email che inizia con "2fa" → codice dell'app di autenticazione; "sms" → codice via SMS
+ * - email che inizia con "mail" → codice via email (dispositivo nuovo)
+ * - password "sbagliata" → errore
+ */
+function installFakeLogin() {
+  setLoginTransport(async (_host, method, params) => {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    const email = String(params.username ?? '')
+    const codeOk = String(params.code ?? '') === '123456'
+    switch (method) {
+      case 'userinfo':
+        if (params.password === 'sbagliata') return { result: 2000, error: 'Log in failed.' }
+        if (email.startsWith('2fa')) return { result: 2297, error: 'Two factor authentication required.', token: 't', tfatype: 2 }
+        if (email.startsWith('sms')) return { result: 2297, error: 'Two factor authentication required.', token: 't', tfatype: 1 }
+        if (email.startsWith('mail')) return { result: 2306, error: 'Please verify this device.' }
+        return { result: 0, auth: 'fake' }
+      case 'tfa_login':
+      case 'login':
+        return codeOk ? { result: 0, auth: 'fake' } : { result: 2064, error: 'Invalid code.' }
+      case 'tfa_sendcodeviasms':
+      case 'user/sendemailtfamail':
+        return { result: 0 }
+      default:
+        return { result: 2000, error: `Metodo finto non previsto: ${method}` }
+    }
+  })
+}
+
+/** `signedIn = false` parte dalla schermata di accesso (con ?fake&login). */
+export function installFake(trackSeconds = 6, signedIn = true) {
   setNamespace('musicx-fake')
-  setMemoryAuth({ token: 'fake', host: 'eapi.pcloud.com' })
+  setMemoryAuth(signedIn ? { token: 'fake', host: 'eapi.pcloud.com', kind: 'session' } : null)
+  installFakeLogin()
   setTransport(async (method, params) => {
     await new Promise((resolve) => setTimeout(resolve, 120))
     switch (method) {
       case 'userinfo':
         return { result: 0, email: 'demo@example.com' }
+      case 'logout':
+        return { result: 0 }
       case 'listfolder':
         return { result: 0, metadata: tree }
       case 'getfilelink':
