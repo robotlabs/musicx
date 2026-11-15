@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>musicx</title>
+<style>
+  :root {
+    --bg: #121218; --bg2: #1a1a23; --bg3: #23232e;
+    --fg: #e8e8f0; --fg-dim: #8a8a9a;
+    --accent: #7c5cff; --accent2: #4ecdc4;
+    --border: #2c2c3a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    padding: 10px 16px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  header h1 { font-size: 16px; color: var(--accent); font-weight: 700; letter-spacing: 1px; }
+  #status { font-size: 12px; color: var(--fg-dim); }
+  #status.err { color: #ff6b6b; }
+  #search {
+    margin-left: auto; background: var(--bg3); border: 1px solid var(--border);
+    color: var(--fg); padding: 6px 10px; border-radius: 6px; width: 220px; font-size: 13px;
+  }
+  main { flex: 1; display: flex; min-height: 0; }
+  /* ---- browser ---- */
+  #browser { flex: 1.4; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--border); }
+  #crumbs {
+    padding: 8px 16px; font-size: 13px; color: var(--fg-dim);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+    white-space: nowrap; overflow-x: auto;
+  }
+  #crumbs span { color: var(--accent2); cursor: pointer; }
+  #crumbs span:hover { text-decoration: underline; }
+  #list { flex: 1; overflow-y: auto; }
+  .row {
+    display: flex; align-items: center; gap: 8px; padding: 7px 16px;
+    font-size: 14px; cursor: default; border-bottom: 1px solid rgba(44,44,58,.4);
+  }
+  .row:hover { background: var(--bg2); }
+  .row.playing { background: rgba(124,92,255,.15); }
+  .row .icon { width: 20px; text-align: center; flex-shrink: 0; }
+  .row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.dir .name { cursor: pointer; color: var(--accent2); }
+  .row.track .name { cursor: pointer; }
+  .row button {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--fg);
+    border-radius: 5px; padding: 2px 9px; font-size: 12px; cursor: pointer; flex-shrink: 0;
+  }
+  .row button:hover { border-color: var(--accent); color: var(--accent); }
+  /* ---- playlists ---- */
+  #plpanel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg2); }
+  #plhead { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
+  #plselect { flex: 1; min-width: 120px; background: var(--bg3); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 6px; font-size: 13px; }
+  #plhead button, #plactions button {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--fg);
+    border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer;
+  }
+  #plhead button:hover, #plactions button:hover { border-color: var(--accent); color: var(--accent); }
+  #plactions { padding: 8px 14px; display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  #pltracks { flex: 1; overflow-y: auto; }
+  .plrow { display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 13px; border-bottom: 1px solid rgba(44,44,58,.4); }
+  .plrow:hover { background: var(--bg3); }
+  .plrow.playing { background: rgba(124,92,255,.15); }
+  .plrow .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .plrow button { background: none; border: none; color: var(--fg-dim); cursor: pointer; font-size: 13px; padding: 0 3px; }
+  .plrow button:hover { color: var(--accent); }
+  #copymenu {
+    position: fixed; z-index: 10; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.5); min-width: 180px; overflow: hidden;
+  }
+  #copymenu .cmtitle { padding: 7px 12px; font-size: 11px; color: var(--fg-dim); border-bottom: 1px solid var(--border); }
+  #copymenu .cmitem { padding: 8px 12px; font-size: 13px; cursor: pointer; }
+  #copymenu .cmitem:hover { background: var(--bg2); color: var(--accent); }
+  /* ---- player bar ---- */
+  footer {
+    background: var(--bg2); border-top: 1px solid var(--border);
+    padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+  }
+  #now { min-width: 0; flex: 1; }
+  #nowname { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #nowdir { font-size: 11px; color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  footer .ctl {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--fg);
+    border-radius: 50%; width: 36px; height: 36px; font-size: 15px; cursor: pointer; flex-shrink: 0;
+  }
+  footer .ctl:hover { border-color: var(--accent); color: var(--accent); }
+  audio { width: 340px; flex-shrink: 0; }
+  .empty { padding: 24px 16px; color: var(--fg-dim); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>musicx</h1>
+  <div id="status">connessione…</div>
+  <input id="search" type="text" placeholder="filtra in questa cartella…">
+</header>
+
+<main>
+  <div id="browser">
+    <div id="crumbs"></div>
+    <div id="list"></div>
+  </div>
+  <div id="plpanel">
+    <div id="plhead">
+      <select id="plselect"></select>
+      <button onclick="newPlaylist()">＋ Nuova</button>
+      <button onclick="deletePlaylist()">🗑</button>
+    </div>
+    <div id="plactions">
+      <button onclick="playPlaylist(0)">▶ Suona playlist</button>
+      <button onclick="exportM3U()">⬇ Esporta .m3u</button>
+      <button onclick="document.getElementById('m3ufile').click()">⬆ Importa .m3u</button>
+      <input type="file" id="m3ufile" accept=".m3u,.m3u8" style="display:none" onchange="importM3U(this)">
+    </div>
+    <div id="pltracks"></div>
+  </div>
+</main>
+
+<footer>
+  <button class="ctl" onclick="prev()">⏮</button>
+  <button class="ctl" onclick="next()">⏭</button>
+  <div id="now"><div id="nowname">—</div><div id="nowdir"></div></div>
+  <audio id="audio" controls></audio>
+</footer>
+
+<script>
+const BASE = "http://127.0.0.1:8620";
+const AUDIO_EXT = ["mp3","flac","m4a","aac","ogg","oga","opus","wav","aif","aiff","wma","alac","aax","m4b"];
+
+let currentPath = "/";        // sempre con / iniziale e finale, percent-encoded
+let entries = [];             // {href, name, isDir}
+let queue = [];               // [{href, name}]
+let qIndex = -1;
+let playlists = loadPL();     // {nome: [{href,name}]}
+let activePL = Object.keys(playlists)[0] || null;
+
+const $ = id => document.getElementById(id);
+const audio = $("audio");
+
+function setStatus(msg, err=false){ const s=$("status"); s.textContent=msg; s.className=err?"err":""; }
+function isAudio(name){ const e=name.split(".").pop().toLowerCase(); return AUDIO_EXT.includes(e); }
+function trackName(href){ const parts=href.split("/").filter(Boolean); return decodeURIComponent(parts[parts.length-1]||href); }
+function dirOf(href){ const parts=href.split("/").filter(Boolean); parts.pop(); return decodeURIComponent(parts.join(" / ")); }
+
+/* ---------- browser ---------- */
+async function loadDir(path){
+  try{
+    setStatus("carico…");
+    const r = await fetch(BASE + path, {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const html = await r.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    entries = [];
+    doc.querySelectorAll("a").forEach(a=>{
+      const href = a.getAttribute("href") || "";
+      if(!href || href.startsWith("..") || href.startsWith("?") || href.startsWith("http")) return;
+      const isDir = href.endsWith("/");
+      const name = decodeURIComponent(isDir ? href.slice(0,-1) : href);
+      if(!isDir && !isAudio(name)) return;
+      entries.push({href: path + href, name, isDir});
+    });
+    entries.sort((a,b)=> (b.isDir - a.isDir) || a.name.localeCompare(b.name, "it"));
+    currentPath = path;
+    $("search").value = "";
+    renderCrumbs(); renderList();
+    setStatus("ok · " + entries.length + " elementi");
+  }catch(e){
+    setStatus("server non raggiungibile — è partito il servizio? (bash switch-to-http.sh)", true);
+    $("list").innerHTML = '<div class="empty">Non riesco a parlare con http://127.0.0.1:8620<br><br>Nel Terminale: <code>launchctl kickstart -k gui/$(id -u)/com.roberto.rclone-music-http</code></div>';
+  }
+}
+
+function renderCrumbs(){
+  const parts = currentPath.split("/").filter(Boolean);
+  let html = '<span onclick="loadDir(\'/\')">musica</span>';
+  let acc = "/";
+  parts.forEach(p=>{
+    acc += p + "/";
+    html += ' / <span onclick="loadDir(\''+acc+'\')">'+decodeURIComponent(p)+'</span>';
+  });
+  $("crumbs").innerHTML = html;
+}
+
+function renderList(){
+  const f = $("search").value.toLowerCase();
+  const shown = entries.filter(e=>!f || e.name.toLowerCase().includes(f));
+  if(!shown.length){ $("list").innerHTML = '<div class="empty">Niente qui.</div>'; return; }
+  $("list").innerHTML = shown.map((e,i)=>{
+    const playing = !e.isDir && queue[qIndex] && queue[qIndex].href===e.href;
+    if(e.isDir) return '<div class="row dir"><div class="icon">📁</div><div class="name" onclick="loadDir(\''+e.href+'\')">'+esc(e.name)+'</div><button onclick="addDirToPL(\''+e.href+'\')" title="aggiungi tutta la cartella alla playlist">＋ pl</button></div>';
+    return '<div class="row track'+(playing?' playing':'')+'" oncontextmenu="trackMenu(event,\''+e.href+'\')"><div class="icon">🎵</div><div class="name" onclick="playFromBrowser(\''+e.href+'\')">'+esc(e.name)+'</div><button onclick="addToPL(\''+e.href+'\')">＋ pl</button></div>';
+  }).join("");
+}
+
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+$("search").addEventListener("input", renderList);
+
+/* ---------- riproduzione ---------- */
+function playFromBrowser(href){
+  queue = entries.filter(e=>!e.isDir).map(e=>({href:e.href, name:e.name}));
+  qIndex = queue.findIndex(t=>t.href===href);
+  playCurrent();
+}
+function playPlaylist(start){
+  if(!activePL || !playlists[activePL] || !playlists[activePL].length) return;
+  queue = playlists[activePL].slice();
+  qIndex = start;
+  playCurrent();
+}
+function playCurrent(){
+  if(qIndex<0 || qIndex>=queue.length) return;
+  const t = queue[qIndex];
+  audio.src = BASE + t.href;
+  audio.play().catch(()=>{});
+  $("nowname").textContent = t.name;
+  $("nowdir").textContent = dirOf(t.href);
+  document.title = "▶ " + t.name;
+  renderList(); renderPLTracks();
+}
+function next(){ if(qIndex < queue.length-1){ qIndex++; playCurrent(); } }
+function prev(){ if(audio.currentTime>3){ audio.currentTime=0; } else if(qIndex>0){ qIndex--; playCurrent(); } }
+audio.addEventListener("ended", next);
+audio.addEventListener("error", ()=>{ if(audio.src){ setStatus("errore su una traccia, passo alla prossima", true); setTimeout(next, 800); } });
+
+/* ---------- playlists ---------- */
+function loadPL(){ try{ return JSON.parse(localStorage.getItem("musicx-playlists")||"{}"); }catch(e){ return {}; } }
+function savePL(){ localStorage.setItem("musicx-playlists", JSON.stringify(playlists)); renderPLSelect(); renderPLTracks(); }
+
+function newPlaylist(){
+  const name = prompt("Nome playlist:"); if(!name) return;
+  if(!playlists[name]) playlists[name]=[];
+  activePL = name; savePL();
+}
+function deletePlaylist(){
+  if(!activePL) return;
+  if(!confirm('Elimino la playlist "'+activePL+'"?')) return;
+  delete playlists[activePL];
+  activePL = Object.keys(playlists)[0]||null; savePL();
+}
+function addToPL(href){
+  if(!activePL){ newPlaylist(); if(!activePL) return; }
+  playlists[activePL].push({href, name: trackName(href)});
+  savePL();
+}
+async function addDirToPL(dirHref){
+  if(!activePL){ newPlaylist(); if(!activePL) return; }
+  setStatus("aggiungo cartella…");
+  const added = await collectDir(dirHref, 0);
+  savePL(); setStatus("aggiunte "+added+" tracce a "+activePL);
+}
+async function collectDir(path, depth){
+  if(depth>4) return 0;
+  let count = 0;
+  try{
+    const r = await fetch(BASE + path, {cache:"no-store"});
+    const doc = new DOMParser().parseFromString(await r.text(), "text/html");
+    for(const a of doc.querySelectorAll("a")){
+      const href = a.getAttribute("href")||"";
+      if(!href || href.startsWith("..") || href.startsWith("?") || href.startsWith("http")) continue;
+      if(href.endsWith("/")){ count += await collectDir(path+href, depth+1); }
+      else if(isAudio(decodeURIComponent(href))){ playlists[activePL].push({href: path+href, name: decodeURIComponent(href)}); count++; }
+    }
+  }catch(e){}
+  return count;
+}
+function removeFromPL(i){ playlists[activePL].splice(i,1); savePL(); }
+function moveInPL(i,d){
+  const arr = playlists[activePL]; const j=i+d;
+  if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]]=[arr[j],arr[i]]; savePL();
+}
+
+function renderPLSelect(){
+  const names = Object.keys(playlists);
+  $("plselect").innerHTML = names.length
+    ? names.map(n=>'<option '+(n===activePL?"selected":"")+'>'+esc(n)+'</option>').join("")
+    : '<option>— nessuna playlist —</option>';
+}
+$("plselect").addEventListener("change", e=>{ activePL=e.target.value; renderPLTracks(); });
+
+function renderPLTracks(){
+  const arr = (activePL && playlists[activePL]) || [];
+  if(!arr.length){ $("pltracks").innerHTML='<div class="empty">Playlist vuota.<br>Usa "＋ pl" sui brani o sulle cartelle.</div>'; return; }
+  $("pltracks").innerHTML = arr.map((t,i)=>{
+    const playing = queue[qIndex] && queue[qIndex].href===t.href;
+    return '<div class="plrow'+(playing?' playing':'')+'" oncontextmenu="plTrackMenu(event,'+i+')">'+
+      '<button onclick="moveInPL('+i+',-1)">▲</button><button onclick="moveInPL('+i+',1)">▼</button>'+
+      '<div class="name" onclick="playPlaylist('+i+')">'+esc(t.name)+'</div>'+
+      '<button onclick="copyMenu(event,'+i+')" title="aggiungi a un\'altra playlist">⧉</button>'+
+      '<button onclick="removeFromPL('+i+')">✕</button></div>';
+  }).join("");
+}
+
+/* ---------- menu contestuale ---------- */
+function showMenu(x, y, title, items){
+  closeMenu();
+  const menu = document.createElement("div");
+  menu.id = "copymenu";
+  menu.innerHTML = '<div class="cmtitle">'+esc(title)+'</div>' +
+    items.map((it,idx)=>'<div class="cmitem" data-i="'+idx+'">'+it.label+'</div>').join("");
+  document.body.appendChild(menu);
+  menu.style.left = Math.min(x, window.innerWidth - menu.offsetWidth - 10) + "px";
+  menu.style.top  = Math.min(y, window.innerHeight - menu.offsetHeight - 10) + "px";
+  menu.addEventListener("click", e=>{
+    const i = e.target.getAttribute("data-i");
+    if(i===null) return;
+    closeMenu(); items[i].fn();
+  });
+  setTimeout(()=>document.addEventListener("click", closeMenu, {once:true}), 0);
+}
+function closeMenu(){ const m=document.getElementById("copymenu"); if(m) m.remove(); }
+
+async function downloadTrack(href, name){
+  try{
+    setStatus('scarico "'+name+'"…');
+    const r = await fetch(BASE + href);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
+    setStatus('"'+name+'" scaricata in Download — da lì la sposti dove vuoi');
+  }catch(e){ setStatus("download fallito: "+e.message, true); }
+}
+
+function playlistTargets(track, exclude){
+  const items = Object.keys(playlists).filter(n=>n!==exclude).map(n=>({
+    label: "＋ "+esc(n),
+    fn: ()=>{ playlists[n].push({href:track.href, name:track.name}); savePL(); setStatus('"'+track.name+'" aggiunta a '+n); }
+  }));
+  items.push({label:"＋ Nuova playlist…", fn:()=>{
+    const t = prompt("Nome nuova playlist:"); if(!t) return;
+    if(!playlists[t]) playlists[t]=[];
+    playlists[t].push({href:track.href, name:track.name}); savePL();
+    setStatus('"'+track.name+'" aggiunta a '+t);
+  }});
+  return items;
+}
+
+function trackMenu(ev, href){
+  ev.preventDefault(); ev.stopPropagation();
+  const track = {href, name: trackName(href)};
+  showMenu(ev.clientX, ev.clientY, track.name, [
+    {label:"▶ Suona", fn:()=>playFromBrowser(href)},
+    {label:"⬇ Scarica copia locale", fn:()=>downloadTrack(href, track.name)},
+    ...playlistTargets(track, null)
+  ]);
+}
+
+function plTrackMenu(ev, i){
+  ev.preventDefault(); ev.stopPropagation();
+  const track = playlists[activePL][i];
+  showMenu(ev.clientX, ev.clientY, track.name, [
+    {label:"▶ Suona", fn:()=>playPlaylist(i)},
+    {label:"⬇ Scarica copia locale", fn:()=>downloadTrack(track.href, track.name)},
+    ...playlistTargets(track, activePL),
+    {label:"✕ Rimuovi da "+esc(activePL), fn:()=>removeFromPL(i)}
+  ]);
+}
+
+function copyMenu(ev, i){
+  ev.stopPropagation();
+  const track = playlists[activePL][i];
+  showMenu(ev.clientX, ev.clientY, "Aggiungi a…", playlistTargets(track, activePL));
+}
+
+/* ---------- m3u ---------- */
+function exportM3U(){
+  if(!activePL || !playlists[activePL].length) return;
+  const lines = ["#EXTM3U"];
+  playlists[activePL].forEach(t=>{ lines.push("#EXTINF:-1,"+t.name); lines.push(BASE+t.href); });
+  const blob = new Blob([lines.join("\n")+"\n"], {type:"audio/x-mpegurl"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = activePL.toLowerCase().replace(/\s+/g,"-") + ".m3u";
+  a.click();
+}
+function importM3U(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const name = file.name.replace(/\.m3u8?$/i,"");
+    const tracks = [];
+    let lastTitle = null;
+    reader.result.split(/\r?\n/).forEach(line=>{
+      line = line.trim();
+      if(line.startsWith("#EXTINF")){ lastTitle = line.split(",").slice(1).join(","); }
+      else if(line.startsWith(BASE)){ const href=line.slice(BASE.length); tracks.push({href, name: lastTitle||trackName(href)}); lastTitle=null; }
+      else if(line.startsWith("/") && !line.startsWith("//")){ tracks.push({href: encodeURI(line), name: lastTitle||trackName(line)}); lastTitle=null; }
+    });
+    if(tracks.length){ playlists[name]=tracks; activePL=name; savePL(); }
+    else alert("Nessuna traccia riconosciuta nel file.");
+  };
+  reader.readAsText(file);
+  input.value = "";
+}
+
+/* ---------- avvio ---------- */
+renderPLSelect(); renderPLTracks();
+loadDir("/");
+</script>
+</body>
+</html>
