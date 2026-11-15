@@ -63,8 +63,14 @@ const someFiles = [...files.keys()]
 const collections: FakeCollection[] = [
   { id: 1, name: 'Preferiti', system: false, fileIds: someFiles.slice(0, 5) },
   { id: 2, name: 'Most Listened', system: true, fileIds: [] },
+  { id: 3, name: 'CCCP ▸ Socialismo e barbarie', system: false, fileIds: someFiles.slice(5, 9) },
+  { id: 4, name: 'CCCP ▸ Live in Punkow', system: false, fileIds: someFiles.slice(9, 12) },
+  { id: 5, name: 'De Gregori ▸ Rimmel', system: false, fileIds: someFiles.slice(12, 20) },
+  { id: 6, name: 'almodovar', system: false, fileIds: someFiles.slice(20, 23) },
+  { id: 7, name: 'Battiato', system: false, fileIds: someFiles.slice(23, 30) },
+  { id: 8, name: 'De Gregori - Alice non lo sa', system: false, fileIds: someFiles.slice(30, 33) },
 ]
-let nextCollectionId = 3
+let nextCollectionId = 9
 
 const describe = (collection: FakeCollection, withContents = false) => ({
   id: collection.id,

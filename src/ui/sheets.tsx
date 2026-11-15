@@ -1,7 +1,7 @@
 // Pannelli sovrapposti (menu, richieste di testo, conferme) e avvisi brevi.
 // Si aprono con una chiamata di funzione da qualunque punto: <SheetHost /> li disegna.
 
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { createPlaylist, playlistsStore } from '../lib/playlists'
 import { createStore, useStore } from '../lib/store'
 import { Icon, type IconName } from './icons'
@@ -152,20 +152,93 @@ export function confirmAction(title: string, body: string, confirm: string): Pro
   })
 }
 
-/** Chiede il nome e crea una playlist. Restituisce l'id, o null se annullato o fallito. */
-export async function createPlaylistFlow(initial = ''): Promise<number | null> {
-  const name = await askText('Nuova playlist', { initial, placeholder: 'Nome', confirm: 'Crea' })
+/** Chiede il nome e crea una playlist (dentro `group`, se dato). Restituisce l'id, o null se annullato o fallito. */
+export async function createPlaylistFlow(initial = '', group: string | null = null): Promise<number | null> {
+  const title = group ? `Nuova playlist in "${group}"` : 'Nuova playlist'
+  const name = await askText(title, { initial, placeholder: 'Nome', confirm: 'Crea' })
   if (!name) return null
   try {
-    return await createPlaylist(name)
+    return await createPlaylist(name, group)
   } catch (error) {
     toast(errorText(error))
     return null
   }
 }
 
-function PlaylistChoices({ onDone }: { onDone: (id: number | 'new') => void }) {
+function PlaylistPicker(props: {
+  title: string
+  confirm: string
+  exclude: Set<number>
+  preselected: number[]
+  onDone: (ids: number[] | null) => void
+}) {
   const lists = useStore(playlistsStore, (state) => state.lists)
+  const [chosen, setChosen] = useState(() => new Set(props.preselected))
+  const shown = lists.filter((list) => !props.exclude.has(list.id))
+  const toggle = (id: number) =>
+    setChosen((current) => {
+      const next = new Set(current)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
+  return (
+    <div className="picker">
+      <header className="sheet-head">
+        <div className="sheet-title">{props.title}</div>
+        <div className="sheet-sub">{chosen.size === 1 ? '1 playlist scelta' : `${chosen.size} playlist scelte`}</div>
+      </header>
+      <ul className="menu checklist">
+        {shown.map((list) => (
+          <li key={list.id}>
+            <label>
+              <input type="checkbox" checked={chosen.has(list.id)} onChange={() => toggle(list.id)} />
+              <span>{list.title}</span>
+              {list.group && <small>{list.group}</small>}
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="dialog-actions picker-actions">
+        <button onClick={() => props.onDone(null)}>Annulla</button>
+        <button className="primary" disabled={chosen.size === 0} onClick={() => props.onDone([...chosen])}>
+          {props.confirm}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Fa spuntare più playlist. Restituisce gli id scelti, o null se annullato. */
+export function choosePlaylists(
+  title: string,
+  options: { confirm: string; exclude?: number[]; preselected?: number[] },
+): Promise<number[] | null> {
+  return new Promise((resolve) => {
+    const done = (ids: number[] | null) => {
+      sheetStore.set(null)
+      resolve(ids)
+    }
+    sheetStore.set({
+      node: (
+        <PlaylistPicker
+          title={title}
+          confirm={options.confirm}
+          exclude={new Set(options.exclude)}
+          preselected={options.preselected ?? []}
+          onDone={done}
+        />
+      ),
+      onDismiss: () => resolve(null),
+    })
+  })
+}
+
+const nameCollator = new Intl.Collator('it', { numeric: true, sensitivity: 'base' })
+
+function PlaylistChoices({ onDone }: { onDone: (id: number | 'new') => void }) {
+  // Per nome completo, così le playlist dello stesso gruppo stanno vicine ("CCCP ▸ …").
+  const lists = useStore(playlistsStore, (state) => state.lists)
+  const sorted = useMemo(() => [...lists].sort((a, b) => nameCollator.compare(a.name, b.name)), [lists])
   return (
     <>
       <header className="sheet-head">
@@ -178,7 +251,7 @@ function PlaylistChoices({ onDone }: { onDone: (id: number | 'new') => void }) {
             <span>Nuova playlist…</span>
           </button>
         </li>
-        {lists.map((list) => (
+        {sorted.map((list) => (
           <li key={list.id}>
             <button onClick={() => onDone(list.id)}>
               <Icon name="list" />

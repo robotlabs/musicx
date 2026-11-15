@@ -239,6 +239,109 @@ ul {
   display: block;
 }
 
+.side-lists a.nested {
+  padding-left: 32px;
+}
+
+/* ---------- Gruppi di playlist ---------- */
+
+.disclosure {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  transition: transform 0.15s ease;
+}
+
+.open > .disclosure,
+.open > .row-main > .disclosure {
+  transform: rotate(90deg);
+}
+
+.side-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 10px 9px 6px;
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+}
+
+.side-group:hover {
+  background: var(--raised);
+}
+
+.side-group .disclosure {
+  width: 18px;
+  color: var(--dim);
+}
+
+.side-group-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-row .disclosure {
+  width: 18px;
+  margin-right: -6px;
+  color: var(--dim);
+}
+
+.row.nested .row-main {
+  padding-left: 40px;
+}
+
+/* ---------- Trascinare brani sulle playlist ---------- */
+
+.drag-ghost {
+  position: fixed;
+  top: -200px;
+  left: 0;
+  max-width: 300px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar .side-lists a.drop-over,
+.side-drop-new.drop-over {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.side-group.drop-hover {
+  background: var(--raised);
+}
+
+.side-lists.dragging a {
+  cursor: copy;
+}
+
+.side-drop-new {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 9px 10px;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ---------- Ricerca ---------- */
 
 .search {
@@ -812,6 +915,53 @@ button:disabled {
   color: var(--dim);
 }
 
+.checklist label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.checklist label:hover {
+  background: var(--raised);
+}
+
+.checklist input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.checklist span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checklist small {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: 13px;
+}
+
+/* I pulsanti restano visibili mentre la lista scorre. */
+.picker-actions {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 6px 4px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
 .menu .danger,
 button.danger:not(.primary) {
   color: var(--danger);
@@ -848,6 +998,11 @@ button.danger:not(.primary) {
   border-radius: 20px;
   background: var(--raised);
   font-weight: 600;
+}
+
+.dialog-actions button.primary {
+  background: var(--accent-fill);
+  color: var(--on-accent);
 }
 
 .dialog-actions button.primary.danger {

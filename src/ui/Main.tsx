@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { MUSIC_ROOT } from '../config'
 import { clearAuth } from '../lib/auth'
 import { clearLibrary, initLibrary, libraryStore, refreshLibrary } from '../lib/library'
+import { isOpen, loadOpenGroups, openGroupsStore, setGroupOpen, toggleGroup } from '../lib/openGroups'
 import { accountEmail, endSession } from '../lib/pcloud'
 import { initPlayer, playerStore, resetPlayer, toggle } from '../lib/player'
-import { playlistsStore, refreshPlaylists, resetPlaylists } from '../lib/playlists'
+import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, type Playlist } from '../lib/playlists'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
 import { useStore } from '../lib/store'
 import { FolderView } from './FolderView'
@@ -14,6 +15,9 @@ import { PlaylistsView } from './PlaylistsView'
 import { PlaylistView } from './PlaylistView'
 import { QueueView } from './QueueView'
 import { SearchView } from './SearchView'
+import { addTracksTo } from './actions'
+import { dragStore, takeDrag, type DragPayload } from './dragTracks'
+import { openCreateMenu, openGroupMenu } from './playlistActions'
 import { confirmAction, createPlaylistFlow, openMenu, SheetHost, toast } from './sheets'
 import { tracksLabel } from './text'
 
@@ -96,12 +100,121 @@ const sections: { route: Route; label: string; icon: IconName; match: Route['nam
   { route: { name: 'queue' }, label: 'Coda', icon: 'queue', match: ['queue'] },
 ]
 
-function Sidebar({ route }: { route: Route }) {
+function SidePlaylists({ route }: { route: Route }) {
   const lists = useStore(playlistsStore, (state) => state.lists)
-  const create = async () => {
-    const id = await createPlaylistFlow()
-    if (id !== null) navigate({ name: 'playlist', id })
+  const open = useStore(openGroupsStore)
+  const { groups, loose } = useMemo(() => groupPlaylists(lists), [lists])
+  const currentId = route.name === 'playlist' ? route.id : null
+  const currentGroup = lists.find((list) => list.id === currentId)?.group ?? null
+
+  // Aprendo una playlist di un gruppo, il gruppo si apre a lato.
+  useEffect(() => {
+    if (currentGroup) setGroupOpen(currentGroup, true)
+  }, [currentId, currentGroup])
+
+  // Brani trascinati dalla pagina: ogni playlist li accetta, un gruppo chiuso si apre se ci si ferma sopra.
+  const dragging = useStore(dragStore) !== null
+  const [over, setOver] = useState<string | null>(null)
+  const openTimer = useRef(0)
+  useEffect(() => {
+    if (dragging) return
+    setOver(null)
+    clearTimeout(openTimer.current)
+  }, [dragging])
+
+  const leave = (key: string) => (event: DragEvent<HTMLElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    if (key.startsWith('g')) clearTimeout(openTimer.current)
+    setOver((current) => (current === key ? null : current))
   }
+
+  const dropOn = (key: string, onDrop: (payload: DragPayload) => void) =>
+    dragging
+      ? {
+          onDragEnter: (event: DragEvent) => {
+            event.preventDefault()
+            setOver(key)
+          },
+          onDragOver: (event: DragEvent) => {
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+          },
+          onDragLeave: leave(key),
+          onDrop: (event: DragEvent) => {
+            event.preventDefault()
+            setOver(null)
+            const payload = takeDrag()
+            if (payload) onDrop(payload)
+          },
+        }
+      : {}
+
+  const openWhileDragging = (group: string, expanded: boolean) =>
+    dragging
+      ? {
+          onDragEnter: () => {
+            setOver(`g${group}`)
+            clearTimeout(openTimer.current)
+            if (!expanded) openTimer.current = window.setTimeout(() => setGroupOpen(group, true), 500)
+          },
+          onDragLeave: leave(`g${group}`),
+        }
+      : {}
+
+  const newPlaylistWith = async (payload: DragPayload) => {
+    const id = await createPlaylistFlow(payload.ids.length > 1 ? payload.label : '')
+    if (id !== null) await addTracksTo(id, payload.ids)
+  }
+
+  const link = (list: Playlist, nested: boolean) => (
+    <a
+      key={list.id}
+      href={routeHref({ name: 'playlist', id: list.id })}
+      className={[nested && 'nested', list.id === currentId && 'current', over === `p${list.id}` && 'drop-over']
+        .filter(Boolean)
+        .join(' ')}
+      {...dropOn(`p${list.id}`, (payload) => void addTracksTo(list.id, payload.ids))}
+    >
+      {list.title}
+    </a>
+  )
+
+  return (
+    <nav className={`side-lists${dragging ? ' dragging' : ''}`}>
+      {dragging && (
+        <div className={`side-drop-new${over === 'new' ? ' drop-over' : ''}`} {...dropOn('new', (payload) => void newPlaylistWith(payload))}>
+          <Icon name="plus" size={16} /> Nuova playlist
+        </div>
+      )}
+      {groups.map((group) => {
+        const expanded = isOpen(open, group.name)
+        return (
+          <Fragment key={group.name}>
+            <button
+              className={`side-group${expanded ? ' open' : ''}${over === `g${group.name}` ? ' drop-hover' : ''}`}
+              aria-expanded={expanded}
+              onClick={() => toggleGroup(group.name)}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                openGroupMenu(group)
+              }}
+              {...openWhileDragging(group.name, expanded)}
+            >
+              <span className="disclosure">
+                <Icon name="chevron" size={14} />
+              </span>
+              <span className="side-group-name">{group.name}</span>
+            </button>
+            {expanded && group.lists.map((list) => link(list, true))}
+          </Fragment>
+        )
+      })}
+      {loose.map((list) => link(list, false))}
+    </nav>
+  )
+}
+
+function Sidebar({ route }: { route: Route }) {
   return (
     <aside className="sidebar">
       <a className="brand" href="#/">
@@ -121,21 +234,11 @@ function Sidebar({ route }: { route: Route }) {
       </nav>
       <div className="side-title">
         Playlist
-        <button className="icon-button" aria-label="Nuova playlist" onClick={() => void create()}>
+        <button className="icon-button" aria-label="Nuova playlist o gruppo" onClick={openCreateMenu}>
           <Icon name="plus" size={18} />
         </button>
       </div>
-      <nav className="side-lists">
-        {lists.map((list) => (
-          <a
-            key={list.id}
-            href={routeHref({ name: 'playlist', id: list.id })}
-            className={route.name === 'playlist' && route.id === list.id ? 'current' : ''}
-          >
-            {list.name}
-          </a>
-        ))}
-      </nav>
+      <SidePlaylists route={route} />
     </aside>
   )
 }
@@ -161,6 +264,7 @@ export function Main() {
   const title = useStore(playerStore, (state) => (state.playing ? state.items[state.index]?.title : undefined))
 
   useEffect(() => {
+    loadOpenGroups()
     initPlayer()
     void initLibrary()
     void refreshPlaylists()

@@ -50,6 +50,7 @@ export function QueueView() {
               playing={playing}
               className={position < index ? 'played' : undefined}
               onPlay={() => jumpTo(position)}
+              draggable
               onMenu={() =>
                 openMenu(
                   item.title,

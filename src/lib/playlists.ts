@@ -1,5 +1,10 @@
 // Le playlist sono le "collection" native di pCloud: nessun file da sincronizzare,
 // e quelle create qui compaiono anche nell'app ufficiale di pCloud.
+//
+// I gruppi di playlist stanno nel nome stesso: "CCCP ▸ Epica etica" è la playlist "Epica etica"
+// nel gruppo "CCCP". pCloud non ha cartelle di playlist, e un file a parte non si può leggere da
+// una web app (gettextfile è riservato a pcloud.com); così invece i gruppi sono gli stessi su ogni
+// dispositivo e si vedono anche nell'app di pCloud.
 
 import { libraryStore, stripExtension } from './library'
 import { collections, type RawCollection, type RawMeta } from './pcloud'
@@ -8,8 +13,47 @@ import { createStore } from './store'
 
 export interface Playlist {
   id: number
+  /** Nome completo su pCloud, gruppo compreso. */
   name: string
+  /** Nome da mostrare, senza gruppo. */
+  title: string
+  group: string | null
   count: number
+}
+
+export interface PlaylistGroup {
+  name: string
+  lists: Playlist[]
+}
+
+const MARK = '▸'
+export const GROUP_SEPARATOR = ` ${MARK} `
+
+/** Il segno del gruppo non può stare dentro un nome, altrimenti verrebbe letto come separatore. */
+export const tidyName = (text: string) => text.replaceAll(MARK, '-').replace(/\s+/g, ' ').trim()
+
+export function splitName(name: string): { group: string | null; title: string } {
+  const at = name.indexOf(MARK)
+  const group = at > 0 ? name.slice(0, at).trim() : ''
+  const title = at > 0 ? name.slice(at + MARK.length).trim() : ''
+  return group && title ? { group, title } : { group: null, title: name }
+}
+
+export const joinName = (group: string | null, title: string) =>
+  group ? `${tidyName(group)}${GROUP_SEPARATOR}${tidyName(title)}` : tidyName(title)
+
+/** Gruppi in ordine alfabetico (ognuno con le sue playlist) e playlist fuori dai gruppi. */
+export function groupPlaylists(lists: Playlist[]): { groups: PlaylistGroup[]; loose: Playlist[] } {
+  const groups = new Map<string, Playlist[]>()
+  const loose: Playlist[] = []
+  for (const list of lists) {
+    if (list.group === null) loose.push(list)
+    else groups.set(list.group, [...(groups.get(list.group) ?? []), list])
+  }
+  return {
+    groups: [...groups].map(([name, lists]) => ({ name, lists })).sort((a, b) => collator.compare(a.name, b.name)),
+    loose,
+  }
 }
 
 export interface PlaylistTrack extends QItem {
@@ -31,7 +75,11 @@ export const playlistsStore = createStore<PlaylistsState>({ lists: [], loaded: f
 
 const collator = new Intl.Collator('it', { numeric: true, sensitivity: 'base' })
 
-const toPlaylist = (raw: RawCollection): Playlist => ({ id: raw.id, name: raw.name, count: raw.items })
+const named = (id: number, name: string, count: number): Playlist => ({ id, name, count, ...splitName(name) })
+
+const toPlaylist = (raw: RawCollection): Playlist => named(raw.id, raw.name, raw.items)
+
+const byTitle = (lists: Playlist[]) => [...lists].sort((a, b) => collator.compare(a.title, b.title))
 
 function toTrack(raw: RawMeta, index: number): PlaylistTrack {
   const parent = raw.parentfolderid ?? null
@@ -51,10 +99,7 @@ const message = (error: unknown) => (error instanceof Error ? error.message : 'E
 export async function refreshPlaylists() {
   try {
     const raw = await collections.list()
-    const lists = raw
-      .filter((collection) => !collection.system)
-      .map(toPlaylist)
-      .sort((a, b) => collator.compare(a.name, b.name))
+    const lists = byTitle(raw.filter((collection) => !collection.system).map(toPlaylist))
     playlistsStore.set((state) => ({ ...state, lists, loaded: true, error: null }))
   } catch (error) {
     playlistsStore.set((state) => ({ ...state, loaded: true, error: message(error) }))
@@ -71,19 +116,15 @@ export async function loadPlaylist(id: number) {
   playlistsStore.set((state) => ({
     ...state,
     tracks: { ...state.tracks, [id]: tracks },
-    lists: state.lists.map((list) => (list.id === id ? { ...list, name: raw.name, count: tracks.length } : list)),
+    lists: state.lists.map((list) => (list.id === id ? named(id, raw.name, tracks.length) : list)),
   }))
 }
 
-export async function createPlaylist(name: string): Promise<number> {
-  const created = await collections.create(name)
+/** Crea una playlist, dentro `group` se indicato. */
+export async function createPlaylist(title: string, group: string | null = null): Promise<number> {
+  const created = await collections.create(joinName(group, title))
   await refreshPlaylists()
   return created.id
-}
-
-export async function renamePlaylist(id: number, name: string) {
-  await collections.rename(id, name)
-  await refreshPlaylists()
 }
 
 export async function deletePlaylist(id: number) {
@@ -114,9 +155,52 @@ function serial<T>(task: () => Promise<T>): Promise<T> {
 }
 
 /** Rilegge da pCloud, ma solo quando non ci sono altre modifiche in fila (eviterebbe salti a schermo). */
-async function settle(id: number) {
+async function settle(id?: number) {
   if (pending > 0) return
-  await Promise.all([loadPlaylist(id), refreshPlaylists()]).catch(() => {})
+  await Promise.all([id === undefined ? undefined : loadPlaylist(id), refreshPlaylists()]).catch(() => {})
+}
+
+/** Rinomina più playlist: subito a schermo, poi su pCloud una alla volta. */
+async function renameMany(changes: { id: number; name: string }[]) {
+  const current = new Map(playlistsStore.get().lists.map((list) => [list.id, list]))
+  const real = changes.filter((change) => current.has(change.id) && current.get(change.id)!.name !== change.name)
+  if (!real.length) return
+  const names = new Map(real.map((change) => [change.id, change.name]))
+  playlistsStore.set((state) => ({
+    ...state,
+    lists: byTitle(state.lists.map((list) => (names.has(list.id) ? named(list.id, names.get(list.id)!, list.count) : list))),
+  }))
+  try {
+    await serial(async () => {
+      for (const change of real) await collections.rename(change.id, change.name)
+    })
+  } finally {
+    await settle()
+  }
+}
+
+const listsWhere = (keep: (list: Playlist) => boolean) => playlistsStore.get().lists.filter(keep)
+
+/** Cambia il nome della playlist lasciandola nel suo gruppo. */
+export function renamePlaylist(id: number, title: string) {
+  const list = listsWhere((item) => item.id === id)[0]
+  return renameMany(list ? [{ id, name: joinName(list.group, title) }] : [])
+}
+
+/** Sposta le playlist in `group` (null = fuori dai gruppi). */
+export function movePlaylistsToGroup(ids: number[], group: string | null) {
+  const chosen = new Set(ids)
+  return renameMany(listsWhere((list) => chosen.has(list.id)).map((list) => ({ id: list.id, name: joinName(group, list.title) })))
+}
+
+/** Rinomina un gruppo, cioè tutte le sue playlist. Con il nome di un gruppo esistente, li unisce. */
+export function renameGroup(from: string, to: string) {
+  return renameMany(listsWhere((list) => list.group === from).map((list) => ({ id: list.id, name: joinName(to, list.title) })))
+}
+
+/** Toglie il gruppo: le playlist restano, fuori dai gruppi. */
+export function ungroup(group: string) {
+  return renameMany(listsWhere((list) => list.group === group).map((list) => ({ id: list.id, name: joinName(null, list.title) })))
 }
 
 const setTracks = (id: number, change: (tracks: PlaylistTrack[]) => PlaylistTrack[]) =>

@@ -1,20 +1,14 @@
 import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { playerStore, playItems, playShuffled } from '../lib/player'
-import {
-  deletePlaylist,
-  loadPlaylist,
-  movePlaylistTrack,
-  playlistsStore,
-  removeFromPlaylist,
-  renamePlaylist,
-  type PlaylistTrack,
-} from '../lib/playlists'
+import { setGroupOpen } from '../lib/openGroups'
+import { loadPlaylist, movePlaylistTrack, playlistsStore, removeFromPlaylist, type PlaylistTrack } from '../lib/playlists'
 import { navigate } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
-import { askText, confirmAction, openMenu, toast } from './sheets'
+import { playlistMenuItems, playlistSubtitle } from './playlistActions'
+import { openMenu, toast } from './sheets'
 import { errorText, tracksLabel } from './text'
 
 interface Drag {
@@ -222,32 +216,17 @@ export function PlaylistView({ id }: { id: number }) {
   }
   if (!tracks || (!list && !listsLoaded)) return <Notice loading title="Carico la playlist…" />
 
-  const name = list?.name ?? 'Playlist'
+  const name = list?.title ?? 'Playlist'
+  const group = list?.group ?? null
 
-  const rename = async () => {
-    const next = await askText('Rinomina playlist', { initial: name, confirm: 'Rinomina' })
-    if (!next || next === name) return
-    renamePlaylist(id, next).catch((problem) => toast(errorText(problem)))
-  }
-  const remove = async () => {
-    const sure = await confirmAction(`Eliminare "${name}"?`, 'La playlist sparisce da pCloud. I brani restano dove sono.', 'Elimina')
-    if (!sure) return
-    try {
-      await deletePlaylist(id)
-      navigate({ name: 'playlists' }, { replace: true })
-    } catch (problem) {
-      toast(errorText(problem))
-    }
-  }
   const openPlaylistMenu = () =>
     openMenu(
       name,
       [
         ...(tracks.length ? queueMenuItems(tracks).slice(0, 2) : []),
-        { label: 'Rinomina', icon: 'edit', onSelect: () => void rename() },
-        { label: 'Elimina playlist', icon: 'trash', danger: true, onSelect: () => void remove() },
+        ...(list ? playlistMenuItems(list, () => navigate({ name: 'playlists' }, { replace: true })) : []),
       ],
-      tracksLabel(tracks.length),
+      list ? playlistSubtitle(list) : tracksLabel(tracks.length),
     )
 
   return (
@@ -257,6 +236,14 @@ export function PlaylistView({ id }: { id: number }) {
           <a href="#/playlists">Playlist</a>
           <Icon name="chevron" size={14} />
         </span>
+        {group && (
+          <span>
+            <a href="#/playlists" onClick={() => setGroupOpen(group, true)}>
+              {group}
+            </a>
+            <Icon name="chevron" size={14} />
+          </span>
+        )}
       </nav>
       <header className="view-head">
         <h1>{name}</h1>

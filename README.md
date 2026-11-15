@@ -8,7 +8,12 @@ installa da Chrome e si usa come un'app.
   Navigazione per cartelle e ricerca istantanea su titolo, artista, album e nome cartella.
 - **Playlist**: sono le playlist native di pCloud (API `collection_*`), quindi le stesse su ogni
   dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando, import dei
-  vecchi `.m3u`.
+  vecchi `.m3u`. Sul Mac un brano o una cartella si trascina direttamente su una playlist della
+  barra laterale (o su "Nuova playlist").
+- **Gruppi di playlist**: apribili con la freccia, nella barra laterale e nella pagina Playlist.
+  pCloud non ha cartelle di playlist, quindi il gruppo sta nel nome: "CCCP ▸ Epica etica" è
+  "Epica etica" nel gruppo "CCCP" (un file a parte non si potrebbe leggere: `gettextfile` è
+  riservato a pcloud.com). Quali gruppi sono aperti lo ricorda ogni dispositivo per conto suo.
 - **Lettore**: coda, casuale, ripeti, ripresa da dove eri rimasto. I formati che Chrome non suona
   (wma, alac…) passano dalla transcodifica mp3 di pCloud. A schermo spento e con i tasti
   multimediali funziona grazie alla Media Session di Chrome.

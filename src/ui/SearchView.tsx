@@ -1,9 +1,10 @@
 import { useDeferredValue, useMemo } from 'react'
-import { libraryStore, searchLibrary, toQueueItem } from '../lib/library'
+import { libraryStore, searchLibrary, toQueueItem, tracksUnder } from '../lib/library'
 import { playerStore, playItems } from '../lib/player'
 import { routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
+import { dragSource } from './dragTracks'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
 import { tracksLabel } from './text'
@@ -33,7 +34,14 @@ export function SearchView({ query }: { query: string }) {
           <h2 className="section">Cartelle</h2>
           <ul className="rows">
             {found.folders.map((folder) => (
-              <li className="row" key={folder.id}>
+              <li
+                className="row"
+                key={folder.id}
+                {...dragSource(() => {
+                  const library = libraryStore.get().library
+                  return library ? { ids: tracksUnder(library, folder.id), label: folder.name } : null
+                })}
+              >
                 <a className="row-main" href={routeHref({ name: 'folder', id: folder.id })}>
                   <span className="row-icon folder">
                     <Icon name="folder" size={18} />
@@ -60,6 +68,7 @@ export function SearchView({ query }: { query: string }) {
                 playing={playing}
                 onPlay={() => playItems(found.items, i)}
                 onMenu={() => openTrackMenu(item, { parent: found.tracks[i].parent })}
+                draggable
               />
             ))}
           </ul>

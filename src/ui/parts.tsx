@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from 'react'
 import type { QItem } from '../lib/queue'
+import { dragSource } from './dragTracks'
 import { Icon } from './icons'
 
 /** Le tre barrette che segnano il brano in riproduzione (animate solo mentre suona). */
@@ -24,10 +25,13 @@ export function TrackRow(props: {
   leading?: ReactNode
   className?: string
   style?: CSSProperties
+  /** Se dato, la riga si può trascinare sulle playlist della barra laterale. */
+  draggable?: boolean
 }) {
   const { item, active } = props
+  const drag = props.draggable ? dragSource(() => ({ ids: [item.id], label: item.title })) : {}
   return (
-    <li className={`row${active ? ' active' : ''}${props.className ? ` ${props.className}` : ''}`} style={props.style}>
+    <li className={`row${active ? ' active' : ''}${props.className ? ` ${props.className}` : ''}`} style={props.style} {...drag}>
       {props.leading}
       <button className="row-main" onClick={props.onPlay}>
         <span className="row-icon">{active ? <Bars moving={props.playing} /> : <Icon name="music" size={18} />}</span>

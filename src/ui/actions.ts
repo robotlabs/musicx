@@ -12,10 +12,14 @@ import { errorText, tracksLabel } from './text'
 export async function addToPlaylistFlow(trackIds: number[]) {
   if (!trackIds.length) return
   const id = await choosePlaylist()
-  if (id === null) return
+  if (id !== null) await addTracksTo(id, trackIds)
+}
+
+/** Aggiunge i brani alla playlist e dice com'è andata. */
+export async function addTracksTo(id: number, trackIds: number[]) {
   try {
     const added = await addToPlaylist(id, trackIds)
-    const name = playlistsStore.get().lists.find((list) => list.id === id)?.name ?? 'playlist'
+    const name = playlistsStore.get().lists.find((list) => list.id === id)?.title ?? 'playlist'
     const skipped = trackIds.length - added
     if (added === 0) toast(trackIds.length === 1 ? `È già in "${name}".` : `Sono già tutti in "${name}".`)
     else toast(`${tracksLabel(added)} in "${name}"${skipped ? ` (${skipped} già presenti)` : ''}.`)

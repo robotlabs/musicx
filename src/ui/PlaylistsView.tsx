@@ -1,11 +1,20 @@
-import { useRef, type ChangeEvent } from 'react'
+import { useMemo, useRef, type ChangeEvent } from 'react'
 import { libraryStore } from '../lib/library'
 import { matchM3u, parseM3u } from '../lib/m3u'
-import { addToPlaylist, playlistsStore, refreshPlaylists } from '../lib/playlists'
+import { isOpen, openGroupsStore, toggleGroup } from '../lib/openGroups'
+import {
+  addToPlaylist,
+  groupPlaylists,
+  playlistsStore,
+  refreshPlaylists,
+  type Playlist,
+  type PlaylistGroup,
+} from '../lib/playlists'
 import { navigate, routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { Icon } from './icons'
 import { Notice } from './parts'
+import { newGroupFlow, openGroupMenu, openPlaylistMenu, playlistCount } from './playlistActions'
 import { createPlaylistFlow, toast } from './sheets'
 import { errorText, tracksLabel } from './text'
 
@@ -28,8 +37,57 @@ async function importM3u(file: File) {
   }
 }
 
+function PlaylistRow({ list, nested = false }: { list: Playlist; nested?: boolean }) {
+  return (
+    <li className={`row${nested ? ' nested' : ''}`}>
+      <a className="row-main" href={routeHref({ name: 'playlist', id: list.id })}>
+        <span className="row-icon folder">
+          <Icon name="list" size={18} />
+        </span>
+        <span className="row-text">
+          <span className="row-title">{list.title}</span>
+          <span className="row-sub">{tracksLabel(list.count)}</span>
+        </span>
+      </a>
+      <button className="icon-button" aria-label={`Azioni per ${list.title}`} onClick={() => openPlaylistMenu(list)}>
+        <Icon name="more" />
+      </button>
+    </li>
+  )
+}
+
+function GroupRows({ group, open }: { group: PlaylistGroup; open: boolean }) {
+  const tracks = group.lists.reduce((sum, list) => sum + list.count, 0)
+  return (
+    <>
+      <li className={`row group-row${open ? ' open' : ''}`}>
+        <button className="row-main" aria-expanded={open} onClick={() => toggleGroup(group.name)}>
+          <span className="disclosure">
+            <Icon name="chevron" size={16} />
+          </span>
+          <span className="row-icon folder">
+            <Icon name="folder" size={18} />
+          </span>
+          <span className="row-text">
+            <span className="row-title">{group.name}</span>
+            <span className="row-sub">
+              {playlistCount(group.lists.length)} · {tracksLabel(tracks)}
+            </span>
+          </span>
+        </button>
+        <button className="icon-button" aria-label={`Azioni per il gruppo ${group.name}`} onClick={() => openGroupMenu(group)}>
+          <Icon name="more" />
+        </button>
+      </li>
+      {open && group.lists.map((list) => <PlaylistRow key={list.id} list={list} nested />)}
+    </>
+  )
+}
+
 export function PlaylistsView() {
   const { lists, loaded, error } = useStore(playlistsStore)
+  const open = useStore(openGroupsStore)
+  const { groups, loose } = useMemo(() => groupPlaylists(lists), [lists])
   const fileInput = useRef<HTMLInputElement>(null)
 
   const create = async () => {
@@ -51,6 +109,9 @@ export function PlaylistsView() {
           <button className="pill primary" onClick={() => void create()}>
             <Icon name="plus" size={16} /> Nuova
           </button>
+          <button className="pill" onClick={() => void newGroupFlow()}>
+            <Icon name="folder" size={16} /> Nuovo gruppo
+          </button>
           <button className="pill" onClick={() => fileInput.current?.click()}>
             <Icon name="upload" size={16} /> Importa .m3u
           </button>
@@ -65,18 +126,11 @@ export function PlaylistsView() {
         <Notice title="Ancora nessuna playlist" body='Creane una, oppure usa "Aggiungi a playlist" dal menu ⋯ di un brano o di una cartella.' />
       )}
       <ul className="rows">
-        {lists.map((list) => (
-          <li className="row" key={list.id}>
-            <a className="row-main" href={routeHref({ name: 'playlist', id: list.id })}>
-              <span className="row-icon folder">
-                <Icon name="list" size={18} />
-              </span>
-              <span className="row-text">
-                <span className="row-title">{list.name}</span>
-                <span className="row-sub">{tracksLabel(list.count)}</span>
-              </span>
-            </a>
-          </li>
+        {groups.map((group) => (
+          <GroupRows key={group.name} group={group} open={isOpen(open, group.name)} />
+        ))}
+        {loose.map((list) => (
+          <PlaylistRow key={list.id} list={list} />
         ))}
       </ul>
     </>
