@@ -2,13 +2,32 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { authStore, consumeLoginRedirect } from './lib/auth'
 import { useStore } from './lib/store'
+import { updateStore, watchForUpdates } from './lib/update'
 import './styles.css'
 import { Login } from './ui/Login'
 import { Main } from './ui/Main'
 
+function UpdateBanner() {
+  const ready = useStore(updateStore)
+  if (!ready) return null
+  return (
+    <div className="update-banner" role="status">
+      <span>C'è una versione nuova di musicx.</span>
+      <button className="pill primary" onClick={() => location.reload()}>
+        Aggiorna
+      </button>
+    </div>
+  )
+}
+
 function App() {
   const signedIn = useStore(authStore, (state) => state.auth !== null)
-  return signedIn ? <Main /> : <Login />
+  return (
+    <>
+      {signedIn ? <Main /> : <Login />}
+      <UpdateBanner />
+    </>
+  )
 }
 
 async function start() {
@@ -29,8 +48,9 @@ async function start() {
     </StrictMode>,
   )
 
-  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {})
+  if (import.meta.env.PROD) {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
+    watchForUpdates()
   }
 }
 

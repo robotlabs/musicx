@@ -118,6 +118,15 @@ export function PlaylistsView() {
           <input ref={fileInput} type="file" accept=".m3u,.m3u8,audio/x-mpegurl" hidden onChange={onFile} />
         </div>
       </header>
+      {loaded && groups.length === 0 && lists.length > 1 && (
+        <p className="tip">
+          <Icon name="folder" size={16} />
+          <span>
+            Per raggruppare le playlist: <b>Nuovo gruppo</b> qui sopra, oppure il menu ⋯ di una playlist →{' '}
+            <b>Sposta in gruppo</b>.
+          </span>
+        </p>
+      )}
       {!loaded && <Notice loading title="Carico le playlist…" />}
       {loaded && error && (
         <Notice title="Non riesco a leggere le playlist" body={error} action={{ label: 'Riprova', run: () => void refreshPlaylists() }} />

@@ -2,7 +2,7 @@
 // Pagina: prima la rete, poi la cache. File in assets/ (nomi con hash, non cambiano mai): prima la cache.
 // Le richieste a pCloud non passano mai di qui.
 
-const CACHE = 'musicx-shell-v1'
+const CACHE = 'musicx-shell-v2'
 
 self.addEventListener('install', () => self.skipWaiting())
 
@@ -22,7 +22,9 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      // GitHub Pages dice al browser di tenere la pagina 10 minuti: "no-cache" la fa sempre
+      // ricontrollare (costa una risposta 304), altrimenti dopo un aggiornamento si vede la vecchia.
+      fetch(request.url, { cache: 'no-cache', credentials: 'same-origin' })
         .then((response) => {
           const copy = response.clone()
           caches.open(CACHE).then((cache) => cache.put('./', copy))

@@ -150,18 +150,3 @@ export function openGroupMenu(group: PlaylistGroup) {
     playlistCount(group.lists.length),
   )
 }
-
-/** Il "+" accanto alle playlist: nuova playlist o nuovo gruppo. */
-export function openCreateMenu() {
-  openMenu('Crea', [
-    {
-      label: 'Nuova playlist',
-      icon: 'list',
-      onSelect: async () => {
-        const id = await createPlaylistFlow()
-        if (id !== null) navigate({ name: 'playlist', id })
-      },
-    },
-    { label: 'Nuovo gruppo di playlist', icon: 'folder', onSelect: () => void newGroupFlow() },
-  ])
-}

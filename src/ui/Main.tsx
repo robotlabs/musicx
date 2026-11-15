@@ -17,7 +17,7 @@ import { QueueView } from './QueueView'
 import { SearchView } from './SearchView'
 import { addTracksTo } from './actions'
 import { dragStore, takeDrag, type DragPayload } from './dragTracks'
-import { openCreateMenu, openGroupMenu } from './playlistActions'
+import { newGroupFlow, openGroupMenu } from './playlistActions'
 import { confirmAction, createPlaylistFlow, openMenu, SheetHost, toast } from './sheets'
 import { tracksLabel } from './text'
 
@@ -214,6 +214,11 @@ function SidePlaylists({ route }: { route: Route }) {
   )
 }
 
+async function newPlaylist() {
+  const id = await createPlaylistFlow()
+  if (id !== null) navigate({ name: 'playlist', id })
+}
+
 function Sidebar({ route }: { route: Route }) {
   return (
     <aside className="sidebar">
@@ -234,9 +239,19 @@ function Sidebar({ route }: { route: Route }) {
       </nav>
       <div className="side-title">
         Playlist
-        <button className="icon-button" aria-label="Nuova playlist o gruppo" onClick={openCreateMenu}>
-          <Icon name="plus" size={18} />
-        </button>
+        <span className="side-title-actions">
+          <button
+            className="icon-button"
+            aria-label="Nuovo gruppo di playlist"
+            title="Nuovo gruppo di playlist"
+            onClick={() => void newGroupFlow()}
+          >
+            <Icon name="folderPlus" size={18} />
+          </button>
+          <button className="icon-button" aria-label="Nuova playlist" title="Nuova playlist" onClick={() => void newPlaylist()}>
+            <Icon name="plus" size={18} />
+          </button>
+        </span>
       </div>
       <SidePlaylists route={route} />
     </aside>

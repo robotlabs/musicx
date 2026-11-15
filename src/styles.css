@@ -295,6 +295,56 @@ ul {
   padding-left: 40px;
 }
 
+.side-title-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 4px 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.tip .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.tip b {
+  color: var(--text);
+}
+
+.update-banner {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 6px 6px 16px;
+  border-radius: 24px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 14px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+}
+
+.update-banner .pill {
+  height: 32px;
+}
+
 /* ---------- Trascinare brani sulle playlist ---------- */
 
 .drag-ghost {
