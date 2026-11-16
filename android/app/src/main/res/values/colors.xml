@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Gli stessi colori del sito (public/manifest.webmanifest, src/styles.css). -->
+    <color name="musicx_background">#0F0F13</color>
+    <color name="colorPrimary">#101014</color>
+    <color name="colorPrimaryDark">#101014</color>
+    <color name="colorAccent">#7557F0</color>
+</resources>

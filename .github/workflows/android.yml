@@ -1,0 +1,67 @@
+name: App Android
+
+# L'app è un guscio attorno al sito: l'APK va ricostruito solo quando cambia la parte nativa.
+# Ogni build finisce in una release; l'ultima si scarica sempre da
+# https://github.com/robotlabs/musicx/releases/latest/download/musicx.apk
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+
+      # Sempre la stessa chiave, altrimenti Android rifiuta di installare un APK sopra l'altro.
+      - name: Chiave di firma
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MUSICX_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "Manca il segreto MUSICX_KEYSTORE_BASE64"; exit 1; }
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/musicx.jks"
+          echo "MUSICX_KEYSTORE=$RUNNER_TEMP/musicx.jks" >> "$GITHUB_ENV"
+
+      - name: APK firmato
+        working-directory: android
+        env:
+          MUSICX_KEYSTORE_PASSWORD: ${{ secrets.MUSICX_KEYSTORE_PASSWORD }}
+          MUSICX_KEY_ALIAS: ${{ secrets.MUSICX_KEY_ALIAS }}
+          MUSICX_KEY_PASSWORD: ${{ secrets.MUSICX_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease -PmusicxVersionCode=${{ github.run_number }}
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk musicx.apk
+          gh release create "android-${{ github.run_number }}" musicx.apk \
+            --title "musicx per Android (versione ${{ github.run_number }})" \
+            --notes "Si installa sopra la versione precedente. L'interfaccia si aggiorna da sola anche senza nuovo APK." \
+            --latest

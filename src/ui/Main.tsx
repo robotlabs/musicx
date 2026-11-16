@@ -3,6 +3,7 @@ import { MUSIC_ROOT } from '../config'
 import { clearAuth } from '../lib/auth'
 import { clearLibrary, initLibrary, libraryStore, refreshLibrary } from '../lib/library'
 import { isOpen, loadOpenGroups, openGroupsStore, setGroupOpen, toggleGroup } from '../lib/openGroups'
+import { ANDROID_APP_URL, isAndroidBrowser } from '../lib/native'
 import { accountEmail, endSession } from '../lib/pcloud'
 import { initPlayer, playerStore, resetPlayer, toggle } from '../lib/player'
 import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, type Playlist } from '../lib/playlists'
@@ -50,6 +51,10 @@ function openAppMenu() {
     'musicx',
     [
       { label: 'Aggiorna la libreria da pCloud', icon: 'refresh', onSelect: () => void refresh() },
+      // In Chrome sul telefono i brani non suonano: l'app sì.
+      ...(isAndroidBrowser
+        ? [{ label: "Scarica l'app per Android", icon: 'upload' as const, onSelect: () => location.assign(ANDROID_APP_URL) }]
+        : []),
       { label: 'Esci da pCloud', icon: 'logout', danger: true, onSelect: () => void logout() },
     ],
     details,

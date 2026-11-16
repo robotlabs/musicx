@@ -5,6 +5,7 @@
 
 import { LOCAL_SOURCE } from '../config'
 import { extensionOf, libraryStore, type Library } from './library'
+import { isAndroidBrowser } from './native'
 import { PCloudError } from './pcloud'
 import type { QItem } from './queue'
 
@@ -106,8 +107,14 @@ export async function whyNotPlayable(item: QItem, needsTranscode: boolean): Prom
       fatal: false,
     }
   }
+  if (isAndroidBrowser) {
+    return {
+      message: 'In Chrome pCloud non lascia suonare i brani: sul telefono usa l\'app musicx per Android.',
+      fatal: true,
+    }
+  }
   if (!enabled) {
-    return { message: 'pCloud non lascia suonare i brani alle app web: per ora musicx suona solo sul Mac.', fatal: true }
+    return { message: 'pCloud non ha dato il brano a musicx ("Invalid link referer").', fatal: true }
   }
   if ((await access()) === 'denied') {
     return {

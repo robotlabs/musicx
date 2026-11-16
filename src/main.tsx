@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { authStore, consumeLoginRedirect } from './lib/auth'
+import { isNativeApp } from './lib/native'
 import { useStore } from './lib/store'
 import { updateStore, watchForUpdates } from './lib/update'
 import './styles.css'
@@ -49,7 +50,9 @@ async function start() {
   )
 
   if (import.meta.env.PROD) {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
+    // Nell'app Android il sito arriva sempre dalla rete attraverso il guscio nativo, che ci aggiunge
+    // il suo ponte: una copia in cache del service worker lo salterebbe.
+    if ('serviceWorker' in navigator && !isNativeApp) navigator.serviceWorker.register('./sw.js').catch(() => {})
     watchForUpdates()
   }
 }

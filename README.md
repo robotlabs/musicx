@@ -1,17 +1,41 @@
 # musicx
 
-Player musicale personale. Una web app installabile (PWA) che legge libreria e playlist
-direttamente da pCloud (`/rob/music`). Sul Mac e su Android si installa da Chrome e si usa come
-un'app.
+Player musicale personale. Una web app (PWA) che legge libreria e playlist direttamente da pCloud
+(`/rob/music`). Sul Mac si installa da Chrome; su Android c'è un'app che è solo un guscio attorno
+allo stesso sito.
 
-**L'audio non arriva da pCloud.** pCloud non dà i link ai file alle app web: `getfilelink`,
+**Da dove arriva l'audio.** pCloud non dà i link ai file alle pagine web: `getfilelink`,
 `getaudiolink` e tutti gli altri metodi che danno link rispondono "Invalid link referer" a chi non
-è pcloud.com, anche senza Referer. Sul Mac i brani passano quindi da rclone, il servizio launchd
-`com.roberto.rclone-music-http` (`rclone serve http pcloud:rob/music` su `127.0.0.1:8620`); la
-prima volta Chrome chiede il permesso di accedere ai servizi del computer ("rete locale"). Sul
-telefono per ora i brani non suonano. Se rclone smette di rispondere perché pCloud gli ha revocato
-l'accesso, si ricollega con `rclone config reconnect pcloud:` e poi
-`launchctl kickstart -k gui/$(id -u)/com.roberto.rclone-music-http`.
+è pcloud.com, anche senza Referer. Quindi:
+
+- **Mac**: i brani passano da rclone, il servizio launchd `com.roberto.rclone-music-http`
+  (`rclone serve http pcloud:rob/music` su `127.0.0.1:8620`). La prima volta Chrome chiede il
+  permesso di accedere ai servizi del computer ("rete locale"). Se rclone smette di rispondere
+  perché pCloud gli ha revocato l'accesso: `rclone config reconnect pcloud:` e poi
+  `launchctl kickstart -k gui/$(id -u)/com.roberto.rclone-music-http`.
+- **Android**: l'app musicx (Capacitor) carica il sito pubblicato e chiede i link dal lato nativo
+  (`CapacitorHttp`, senza Origin né Referer). Il link vale per l'IP che l'ha chiesto, cioè il
+  telefono, e l'`<audio>` della pagina lo suona. Notifica, schermata di blocco e musica a schermo
+  spento li fa `@capgo/capacitor-media-session`. In Chrome sul telefono i brani non suonano: il
+  menu ⋯ offre di scaricare l'app.
+
+## App Android
+
+Si scarica da <https://github.com/robotlabs/musicx/releases/latest/download/musicx.apk> e si
+installa una volta (Android chiede di consentire le app da origine sconosciuta). L'interfaccia
+arriva dal sito, quindi si aggiorna da sola a ogni pubblicazione; l'APK va rifatto solo quando
+cambia la parte nativa (`android/`, `capacitor.config.ts`, dipendenze): lo fa
+`.github/workflows/android.yml`, che lo firma sempre con la stessa chiave (segreti
+`MUSICX_KEYSTORE_*`; l'originale è sul Mac in `~/.config/musicx/android/`) e lo mette in una
+release. Senza quella chiave un APK nuovo non si installa sopra il vecchio.
+
+Per provarla nell'emulatore contro il server di sviluppo:
+
+```bash
+adb reverse tcp:5173 tcp:5173
+CAP_SERVER_URL='http://localhost:5173/?fake=8' npx cap sync android
+cd android && ./gradlew installDebug
+```
 
 - **Libreria**: tutto l'albero di `/rob/music` letto in una chiamata e salvato nel browser.
   Navigazione per cartelle e ricerca istantanea su titolo, artista, album e nome cartella.
@@ -77,8 +101,8 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 - Niente mount di pCloud sul Mac (pCloud Drive, rclone nfsmount, FUSE, WebDAV): bloccavano Finder
   e VLC in modo irrecuperabile. Il vecchio player basato su `rclone serve http` è in `legacy/`;
   il servizio rclone invece resta acceso, perché sul Mac l'audio di musicx passa da lì.
-- Niente Electron / React Native / Capacitor: Chrome gestisce da solo audio in background,
-  notifica e lock screen per una PWA installata.
+- Niente app native "vere": su Android il guscio Capacitor serve solo per i link di pCloud e la
+  Media Session, tutto il resto è il sito. Sul Mac basta la PWA.
 
 ## Struttura
 
@@ -87,6 +111,8 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 - `src/lib/library.ts` – indice della libreria, ricerca, cache in IndexedDB
 - `src/lib/player.ts` – elemento audio, coda, Media Session, tentativi di recupero
 - `src/lib/localSource.ts` – i brani da rclone sul Mac, permesso "rete locale", messaggi d'errore
+- `src/lib/native.ts` – cosa cambia dentro l'app Android (link di pCloud dal lato nativo)
+- `android/`, `capacitor.config.ts`, `assets/` – il guscio Android e le sorgenti delle sue icone
 - `src/lib/queue.ts` – logica della coda (pura, testata)
 - `src/lib/playlists.ts` – playlist pCloud, modifiche in fila una alla volta
 - `src/lib/m3u.ts` – import dei vecchi `.m3u`

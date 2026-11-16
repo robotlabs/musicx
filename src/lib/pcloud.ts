@@ -2,6 +2,7 @@
 // si può sostituire con quello finto usato in sviluppo e nei test.
 
 import { authStore, expireAuth } from './auth'
+import { isNativeApp, nativeGetJson } from './native'
 
 export class PCloudError extends Error {
   constructor(
@@ -19,6 +20,9 @@ export type Transport = (method: string, params: Params, timeoutMs: number) => P
 /** Codici con cui pCloud dice che il token non vale più. */
 const AUTH_ERRORS = new Set([1000, 2000, 2094, 2095])
 
+/** Metodi che pCloud rifiuta alle pagine web ("Referrer is restricted to pcloud.com"). */
+const LINK_METHODS = new Set(['getfilelink', 'getaudiolink'])
+
 const httpTransport: Transport = async (method, params, timeoutMs) => {
   const auth = authStore.get().auth
   if (!auth) throw new PCloudError(1000, 'Accesso richiesto.')
@@ -30,16 +34,20 @@ const httpTransport: Transport = async (method, params, timeoutMs) => {
   // Il token va nei parametri e non in un header: l'API non ammette header extra via CORS.
   query.set(auth.kind === 'session' ? 'auth' : 'access_token', auth.token)
 
+  const url = `https://${auth.host}/${method}?${query}`
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), timeoutMs)
   try {
-    const response = await fetch(`https://${auth.host}/${method}?${query}`, {
-      signal: abort.signal,
-      cache: 'no-store',
-      referrerPolicy: 'no-referrer',
-    })
-    if (!response.ok) throw new PCloudError(response.status, `pCloud ha risposto ${response.status}.`)
-    const data = (await response.json()) as { result: number; error?: string }
+    let reply: { status: number; data: { result: number; error?: string } }
+    if (isNativeApp && LINK_METHODS.has(method)) {
+      // Nell'app Android i link ai brani si chiedono dal lato nativo: alla pagina pCloud li rifiuta.
+      reply = (await nativeGetJson(url, timeoutMs)) as typeof reply
+    } else {
+      const response = await fetch(url, { signal: abort.signal, cache: 'no-store', referrerPolicy: 'no-referrer' })
+      reply = { status: response.status, data: response.ok ? await response.json() : { result: 0 } }
+    }
+    const { status, data } = reply
+    if (status < 200 || status > 299) throw new PCloudError(status, `pCloud ha risposto ${status}.`)
     if (data.result !== 0) throw new PCloudError(data.result, data.error ?? `Errore pCloud ${data.result}.`)
     return data
   } catch (error) {

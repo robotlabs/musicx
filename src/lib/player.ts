@@ -2,10 +2,12 @@
 // La Media Session è ciò che fa continuare la musica a schermo spento su Android e
 // collega i tasti multimediali e il lock screen.
 
+import { MediaSession as NativeSession } from '@capgo/capacitor-media-session'
 import { NATIVE_EXT } from '../config'
 import { storageKey } from './env'
 import { extensionOf } from './library'
 import { forgetLocalSource, isLocalUrl, isRefererError, localUrl, whyNotPlayable } from './localSource'
+import { isNativeApp } from './native'
 import { audioLink, fileLink, PCloudError } from './pcloud'
 import {
   appendToQueue,
@@ -117,7 +119,7 @@ function unload() {
   audio.load()
   patch({ playing: false, loading: false })
   progressStore.set({ position: 0, duration: 0 })
-  if ('mediaSession' in navigator) navigator.mediaSession.metadata = null
+  if (hasWebSession()) navigator.mediaSession.metadata = null
 }
 
 /** Il file non si è lasciato suonare: riprova con un link fresco, poi transcodificato. */
@@ -213,47 +215,80 @@ audio.addEventListener('error', () => {
 })
 
 // --- Media Session ---
+// Nel browser la gestisce Chrome. Nell'app Android la fa il plugin nativo, che mostra i comandi
+// su notifica e schermata di blocco e, mentre c'è musica, tiene viva l'app a schermo spento.
+
+const artwork = () => [{ src: new URL('./icons/icon-512.png', document.baseURI).href, sizes: '512x512', type: 'image/png' }]
+
+const hasWebSession = () => !isNativeApp && 'mediaSession' in navigator
 
 function showMetadata(item: QItem) {
-  if (!('mediaSession' in navigator)) return
-  navigator.mediaSession.metadata = new MediaMetadata({
-    title: item.title,
-    artist: item.sub,
-    artwork: [{ src: new URL('./icons/icon-512.png', document.baseURI).href, sizes: '512x512', type: 'image/png' }],
-  })
+  const metadata = { title: item.title, artist: item.sub, artwork: artwork() }
+  if (isNativeApp) void NativeSession.setMetadata(metadata).catch(() => {})
+  else if (hasWebSession()) navigator.mediaSession.metadata = new MediaMetadata(metadata)
 }
 
 function showPosition() {
-  if (!('mediaSession' in navigator) || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+  if (!Number.isFinite(audio.duration) || audio.duration <= 0) return
+  const state = {
+    duration: audio.duration,
+    position: Math.min(audio.currentTime, audio.duration),
+    playbackRate: audio.playbackRate,
+  }
+  if (isNativeApp) return void NativeSession.setPositionState(state).catch(() => {})
+  if (!hasWebSession()) return
   try {
-    navigator.mediaSession.setPositionState({
-      duration: audio.duration,
-      position: Math.min(audio.currentTime, audio.duration),
-      playbackRate: audio.playbackRate,
-    })
+    navigator.mediaSession.setPositionState(state)
   } catch {
     // Alcuni browser rifiutano stati di posizione che considerano incoerenti: non è grave.
   }
 }
 
+type SessionAction = 'play' | 'pause' | 'previoustrack' | 'nexttrack' | 'seekto' | 'seekbackward' | 'seekforward'
+type SessionHandler = (details: { seekTime?: number | null; seekOffset?: number }) => void
+
 function bindMediaSession() {
-  if (!('mediaSession' in navigator)) return
-  const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
+  const handlers: [SessionAction, SessionHandler][] = [
     ['play', () => resume()],
     ['pause', () => pause()],
     ['previoustrack', () => previous()],
     ['nexttrack', () => next()],
-    ['seekto', (details) => details.seekTime !== undefined && seek(details.seekTime)],
+    ['seekto', (details) => typeof details.seekTime === 'number' && seek(details.seekTime)],
     ['seekbackward', (details) => seek(audio.currentTime - (details.seekOffset ?? 10))],
     ['seekforward', (details) => seek(audio.currentTime + (details.seekOffset ?? 10))],
   ]
-  for (const [action, handler] of handlers) {
-    try {
-      navigator.mediaSession.setActionHandler(action, handler)
-    } catch {
-      // Azione non supportata da questo browser.
+  if (!isNativeApp) {
+    if (!hasWebSession()) return
+    for (const [action, handler] of handlers) {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler as MediaSessionActionHandler)
+      } catch {
+        // Azione non supportata da questo browser.
+      }
     }
+    return
   }
+
+  // Il servizio nativo nasce solo quando la musica parte, e i comandi registrati prima a volte non
+  // gli arrivano (nell'emulatore: notifica con il solo "play"). Si registrano di nuovo appena c'è.
+  const registerHandlers = () => {
+    for (const [action, handler] of handlers) void NativeSession.setActionHandler({ action }, handler).catch(() => {})
+  }
+  registerHandlers()
+  // Lo stato lo dice il lettore, non l'elemento audio: durante un cambio brano resta "playing",
+  // così il servizio nativo non si ferma tra un brano e l'altro a schermo spento.
+  let shown = ''
+  const sync = () => {
+    const state = playerStore.get()
+    const playbackState = state.playing ? 'playing' : state.items.length ? 'paused' : 'none'
+    if (playbackState === shown) return
+    const starting = playbackState !== 'none' && (shown === '' || shown === 'none')
+    shown = playbackState
+    void NativeSession.setPlaybackState({ playbackState }).catch(() => {})
+    if (starting) setTimeout(registerHandlers, 1500)
+  }
+  playerStore.subscribe(sync)
+  sync()
 }
 
 // --- Comandi ---
