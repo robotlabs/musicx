@@ -71,6 +71,8 @@ cd android && ./gradlew installDebug
   ripresa (anche subito dopo un clic; "/" porta alla ricerca). I formati che Chrome non suona
   (wma, alac…) non partono: la transcodifica mp3 di pCloud (`getaudiolink`) ha lo stesso blocco.
   A schermo spento e con i tasti multimediali funziona grazie alla Media Session di Chrome.
+  Il ⋯ accanto al brano che suona apre il suo menu (aggiungi a playlist, vai alla cartella,
+  modifica info); sul Mac il brano si trascina dalla barra in basso su una playlist.
 
 ## Sviluppo
 

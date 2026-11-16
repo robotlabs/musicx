@@ -3,6 +3,7 @@ import { cycleRepeat, next, playerStore, previous, progressStore, seek, toggle, 
 import { libraryStore } from '../lib/library'
 import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
+import { dragTracks } from './drag'
 import { Icon } from './icons'
 import { clock } from './text'
 
@@ -52,12 +53,26 @@ export function PlayerBar() {
 
   return (
     <section className={`player${expanded ? ' expanded' : ''}`} aria-label="Lettore">
-      <button className="now" onClick={() => setExpanded((open) => !open)} aria-expanded={expanded}>
-        <span className="now-title">{item.title}</span>
-        <span className={`now-sub${player.error ? ' error' : ''}`}>
-          {player.error ?? (player.loading && player.playing ? 'Carico…' : item.sub)}
+      {/* Il brano che suona: col mouse si trascina su una playlist della barra laterale, il ⋯ apre il suo menu. */}
+      <div className="now-wrap" {...dragTracks(() => ({ ids: [item.id], label: item.title }))}>
+        <span className="now-icon" title="Trascina su una playlist" aria-hidden="true">
+          <Icon name="music" size={18} />
         </span>
-      </button>
+        <button className="now" onClick={() => setExpanded((open) => !open)} aria-expanded={expanded}>
+          <span className="now-title">{item.title}</span>
+          <span className={`now-sub${player.error ? ' error' : ''}`}>
+            {player.error ?? (player.loading && player.playing ? 'Carico…' : item.sub)}
+          </span>
+        </button>
+        <button
+          className="icon-button now-more"
+          aria-label={`Azioni per ${item.title}`}
+          title="Aggiungi a playlist e altro"
+          onClick={() => openTrackMenu(item, { parent: libraryStore.get().library?.tracks.get(item.id)?.parent })}
+        >
+          <Icon name="more" size={18} />
+        </button>
+      </div>
       <div className="transport">
         <button
           className={`icon-button extra${player.shuffle ? ' on' : ''}`}
@@ -84,15 +99,6 @@ export function PlayerBar() {
         >
           <Icon name="repeat" size={18} />
           {player.repeat === 'one' && <span className="badge">1</span>}
-        </button>
-        {/* Il menu del brano che sta suonando: playlist, cartella, modifica info. */}
-        <button
-          className="icon-button extra"
-          aria-label={`Azioni per ${item.title}`}
-          title="Altre azioni"
-          onClick={() => openTrackMenu(item, { parent: libraryStore.get().library?.tracks.get(item.id)?.parent })}
-        >
-          <Icon name="more" size={18} />
         </button>
       </div>
       <Seek />
