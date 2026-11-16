@@ -189,13 +189,13 @@ ul {
   letter-spacing: 0.02em;
 }
 
-.sidebar nav {
+.side-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.sidebar nav a {
+.side-nav a {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -207,12 +207,12 @@ ul {
   text-overflow: ellipsis;
 }
 
-.sidebar nav a:hover {
+.side-nav a:hover {
   color: var(--text);
   background: var(--raised);
 }
 
-.sidebar nav a.current {
+.side-nav a.current {
   color: var(--text);
   background: var(--raised);
 }
@@ -230,17 +230,39 @@ ul {
   color: var(--dim);
 }
 
+/* Le playlist possono essere centinaia: righe basse e fisse (non si schiacciano), nomi lunghi con i puntini. */
 .side-lists {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
   overflow-y: auto;
   min-height: 0;
 }
 
-.side-lists a {
-  display: block;
+.side-lists > * {
+  flex: none;
 }
 
+.side-lists a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-lists a:hover,
+.side-lists a.current {
+  color: var(--text);
+  background: var(--raised);
+}
+
+/* Allineate al nome del gruppo: 6px di margine + 18px della freccia + 4px di spazio. */
 .side-lists a.nested {
-  padding-left: 32px;
+  padding-left: 28px;
 }
 
 /* ---------- Gruppi di playlist ---------- */
@@ -262,8 +284,10 @@ ul {
   align-items: center;
   gap: 4px;
   width: 100%;
-  padding: 9px 10px 9px 6px;
+  margin-top: 4px;
+  padding: 6px 10px 6px 6px;
   border-radius: 8px;
+  font-size: 14px;
   color: var(--text);
   font-weight: 600;
   text-align: left;

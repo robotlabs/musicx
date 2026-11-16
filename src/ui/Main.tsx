@@ -156,6 +156,7 @@ function SidePlaylists({ route }: { route: Route }) {
       className={[list.group && 'nested', list.id === currentId && 'current', over === `p${list.id}` && tracks && 'drop-over']
         .filter(Boolean)
         .join(' ')}
+      title={list.title}
       {...dragPlaylist(list)}
       {...(tracks
         ? target(`p${list.id}`, () => void addTracksTo(list.id, tracks.ids))
@@ -212,7 +213,7 @@ function Sidebar({ route }: { route: Route }) {
         <img src="./favicon.svg" alt="" width="28" height="28" />
         musicx
       </a>
-      <nav>
+      <nav className="side-nav">
         {sections.map((section) => (
           <a
             key={section.label}
