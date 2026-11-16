@@ -38,8 +38,11 @@ export interface Library {
   builtAt: number
 }
 
+/** 2: i brani hanno anche il numero di traccia. Un indice salvato con la 1 si mostra e si rilegge subito. */
+const CACHE_VERSION = 2
+
 interface StoredLibrary {
-  version: 1
+  version: 1 | 2
   root: string
   rootId: number
   folders: Folder[]
@@ -61,6 +64,31 @@ export const trackTags = (raw: RawMeta): Pick<Track, 'title' | 'artist' | 'album
   album: clean(raw.album),
   track: clean(raw.trackno === undefined || raw.trackno === 0 ? undefined : String(raw.trackno)),
 })
+
+/** Il numero di traccia scritto nel nome del file: "01 Albachiara", "Track-06", "3. Sally". */
+export function numberInName(fileName: string): number | undefined {
+  const match = /^(?:track|traccia|pista)?[\s._-]*(\d{1,3})(?!\d)/i.exec(stripExtension(fileName))
+  const number = match ? Number(match[1]) : 0
+  return number > 0 ? number : undefined
+}
+
+/** Numero di traccia dal tag o, se manca, dal nome del file. */
+export function trackNumber(track: Track): number | undefined {
+  const tagged = Number.parseInt(track.track ?? '', 10)
+  return tagged > 0 ? tagged : numberInName(track.name)
+}
+
+/**
+ * L'ordine dei brani in una cartella. Se sono tutti dello stesso album (i brani senza album non
+ * contano) vale il numero di traccia, come nel disco; altrimenti, o a parità di numero, il nome del file.
+ */
+export function sortFolderTracks(ids: number[], tracks: Map<number, Track>): number[] {
+  const list = ids.flatMap((id) => tracks.get(id) ?? [])
+  const albums = new Set(list.flatMap((track) => (track.album ? [track.album.toLocaleLowerCase('it')] : [])))
+  const byName = (a: Track, b: Track) => collator.compare(a.name, b.name)
+  const byNumber = (a: Track, b: Track) => (trackNumber(a) ?? Infinity) - (trackNumber(b) ?? Infinity) || byName(a, b)
+  return list.sort(albums.size === 1 ? byNumber : byName).map((track) => track.id)
+}
 
 /** Trasforma la risposta ricorsiva di `listfolder` nell'indice. Le cartelle senza musica spariscono. */
 export function buildLibrary(root: RawMeta, builtAt = Date.now()): Library {
@@ -91,7 +119,7 @@ export function buildLibrary(root: RawMeta, builtAt = Date.now()): Library {
     }
     folder.total += folder.tracks.length
     folder.folders.sort((a, b) => collator.compare(folders.get(a)!.name, folders.get(b)!.name))
-    folder.tracks.sort((a, b) => collator.compare(tracks.get(a)!.name, tracks.get(b)!.name))
+    folder.tracks = sortFolderTracks(folder.tracks, tracks)
     if (folder.total > 0 || parent === -1) folders.set(id, folder)
     return folder.total
   }
@@ -232,12 +260,13 @@ const cacheKey = () => storageKey('library')
 async function readCache(): Promise<Library | null> {
   try {
     const stored = await idbGet<StoredLibrary>(cacheKey())
-    if (!stored || stored.version !== 1 || stored.root !== MUSIC_ROOT) return null
+    if (!stored || stored.version > CACHE_VERSION || stored.root !== MUSIC_ROOT) return null
     return {
       rootId: stored.rootId,
       folders: new Map(stored.folders.map((folder) => [folder.id, folder])),
       tracks: new Map(stored.tracks.map((track) => [track.id, track])),
-      builtAt: stored.builtAt,
+      // Un indice vecchio vale come scaduto: si vede subito e intanto si rilegge.
+      builtAt: stored.version < CACHE_VERSION ? 0 : stored.builtAt,
     }
   } catch {
     return null
@@ -246,7 +275,7 @@ async function readCache(): Promise<Library | null> {
 
 async function writeCache(library: Library) {
   const stored: StoredLibrary = {
-    version: 1,
+    version: CACHE_VERSION,
     root: MUSIC_ROOT,
     rootId: library.rootId,
     folders: [...library.folders.values()],
@@ -312,13 +341,9 @@ export function updateTracks(changes: Map<number, Partial<Omit<Track, 'id' | 'pa
     const track = tracks.get(id)
     if (!track) continue
     tracks.set(id, { ...track, ...change })
-    if (change.name !== undefined && change.name !== track.name) {
-      const folder = folders.get(track.parent)
-      if (folder) {
-        const sorted = [...folder.tracks].sort((a, b) => collator.compare(tracks.get(a)!.name, tracks.get(b)!.name))
-        folders.set(folder.id, { ...folder, tracks: sorted })
-      }
-    }
+    // Nome, album o numero possono cambiare l'ordine nella cartella.
+    const folder = folders.get(track.parent)
+    if (folder) folders.set(folder.id, { ...folder, tracks: sortFolderTracks(folder.tracks, tracks) })
   }
   const next = { ...library, tracks, folders }
   libraryStore.set((state) => ({ ...state, library: next }))

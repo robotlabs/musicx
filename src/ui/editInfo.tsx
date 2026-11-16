@@ -2,7 +2,7 @@
 // artista e album di tanti brani insieme (una cartella, o una selezione sul Mac).
 
 import { useRef, useState, type FormEvent } from 'react'
-import { libraryStore, stripExtension, trackTitle } from '../lib/library'
+import { libraryStore, numberInName, stripExtension, trackTitle } from '../lib/library'
 import { useStore } from '../lib/store'
 import { canWriteTags, saveManyInfo, saveTrackInfo, type InfoChange } from '../lib/trackInfo'
 import { finePointer } from './drag'
@@ -47,8 +47,11 @@ function InfoForm({ ids }: { ids: number[] }) {
     track: common('track') ?? '',
     name: single ? stripExtension(single.name) : '',
   }
-  const [values, setValues] = useState(initial.current)
-  const [touched, setTouched] = useState<ReadonlySet<Field>>(new Set())
+  // Un brano senza numero di traccia nel tag ma con il numero nel nome ("Track-06"): il numero si
+  // propone già, così rinominando il file l'ordine dell'album non si perde.
+  const suggested = single && !single.track && canWriteTags(single.name) ? numberInName(single.name) : undefined
+  const [values, setValues] = useState(() => ({ ...initial.current!, track: suggested ? String(suggested) : initial.current!.track }))
+  const [touched, setTouched] = useState<ReadonlySet<Field>>(() => new Set(suggested ? ['track'] : []))
   const [busy, setBusy] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const stop = useRef(false)

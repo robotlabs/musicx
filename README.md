@@ -39,6 +39,8 @@ cd android && ./gradlew installDebug
 
 - **Libreria**: tutto l'albero di `/rob/music` letto in una chiamata e salvato nel browser.
   Navigazione per cartelle e ricerca istantanea su titolo, artista, album e nome cartella.
+  In una cartella con un album solo i brani seguono il numero di traccia (dal tag o, se manca, dal
+  nome del file: "Track-06"); nelle cartelle miste vanno in ordine alfabetico.
 - **Playlist**: sono le playlist native di pCloud (API `collection_*`), quindi le stesse su ogni
   dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando, import dei
   vecchi `.m3u`. Sul Mac un brano o una cartella si trascina direttamente su una playlist della

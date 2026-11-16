@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLibrary, folderTrail, normalize, searchLibrary, tracksUnder } from './library'
+import { buildLibrary, folderTrail, normalize, numberInName, searchLibrary, tracksUnder, updateTracks, libraryStore } from './library'
 import { matchM3u, parseM3u } from './m3u'
 import type { RawMeta } from './pcloud'
 
@@ -71,5 +71,62 @@ describe('import .m3u', () => {
       'Perché.flac',
     ])
     expect(missing).toEqual(['file:///Users/roberto/pCloud%20Drive/rob/music/sparito.mp3'])
+  })
+})
+
+describe('ordine dei brani in una cartella', () => {
+  const vasco = (name: string, track?: number, album = "Le canzoni d'amore") =>
+    file(name, { artist: 'Vasco Rossi', album, trackno: track })
+  const names = (raw: RawMeta) => {
+    const built = buildLibrary(folder('music', [raw]), 0)
+    const id = [...built.folders.values()].find((entry) => entry.name === raw.name)!.id
+    return built.folders.get(id)!.tracks.map((track) => built.tracks.get(track)!.name)
+  }
+
+  it('in un album segue il numero di traccia, anche quello scritto solo nel nome', () => {
+    const album = folder('canzoni d\'amore', [
+      vasco('Alba chiara.mp3', 1),
+      vasco('Anima fragile.mp3', 4),
+      vasco('Incredibile romantica.mp3', 2),
+      vasco('Track-07.mp3', undefined, "Le Canzoni d'amore"),
+      vasco('La strega.mp3', 3),
+      vasco('Track-06.mp3', undefined, "Le Canzoni d'amore"),
+    ])
+    expect(names(album)).toEqual([
+      'Alba chiara.mp3',
+      'Incredibile romantica.mp3',
+      'La strega.mp3',
+      'Anima fragile.mp3',
+      'Track-06.mp3',
+      'Track-07.mp3',
+    ])
+  })
+
+  it('con album diversi resta in ordine alfabetico', () => {
+    const mixed = folder('Ale Music', [vasco('Zeta.mp3', 1, 'Uno'), vasco('Alfa.mp3', 9, 'Due')])
+    expect(names(mixed)).toEqual(['Alfa.mp3', 'Zeta.mp3'])
+  })
+
+  it('cambiando numero o nome il brano si sposta subito', () => {
+    const album = folder('disco', [vasco('Track-01.mp3'), vasco('Track-02.mp3'), vasco('Track-03.mp3')])
+    const built = buildLibrary(folder('music', [album]), 0)
+    libraryStore.set({ status: 'ready', library: built, error: null, refreshing: false })
+    const folderId = [...built.folders.values()].find((entry) => entry.name === 'disco')!.id
+    const [first] = built.folders.get(folderId)!.tracks
+    updateTracks(new Map([[first, { name: 'Albachiara.mp3', track: '3' }]]))
+    const after = libraryStore.get().library!
+    expect(after.folders.get(folderId)!.tracks.map((id) => after.tracks.get(id)!.name)).toEqual([
+      'Track-02.mp3',
+      'Albachiara.mp3',
+      'Track-03.mp3',
+    ])
+  })
+
+  it('riconosce il numero nel nome del file', () => {
+    expect(numberInName('01 Track 01 1.mp3')).toBe(1)
+    expect(numberInName('Track-06.mp3')).toBe(6)
+    expect(numberInName('3. Sally.mp3')).toBe(3)
+    expect(numberInName('Alba chiara.mp3')).toBeUndefined()
+    expect(numberInName('2001 odissea.mp3')).toBeUndefined()
   })
 })
