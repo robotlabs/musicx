@@ -3,6 +3,7 @@ import { useStore } from '../lib/store'
 import { addToPlaylistFlow } from './actions'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
+import { useSelection } from './selection'
 import { openMenu } from './sheets'
 import { tracksLabel } from './text'
 
@@ -12,6 +13,7 @@ const AFTER = 300
 
 export function QueueView() {
   const { items, index, playing } = useStore(playerStore)
+  const selection = useSelection(items, 'Coda')
 
   if (!items.length) {
     return <Notice title="La coda è vuota" body="Scegli un brano, una cartella o una playlist e parte da lì." />
@@ -50,7 +52,9 @@ export function QueueView() {
               playing={playing}
               className={position < index ? 'played' : undefined}
               onPlay={() => jumpTo(position)}
-              draggable
+              drag={() => selection.dragFrom(position)}
+              selected={selection.rows.has(position)}
+              onSelect={selection.select && ((event) => selection.select?.(position, event))}
               onMenu={() =>
                 openMenu(
                   item.title,

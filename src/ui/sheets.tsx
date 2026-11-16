@@ -14,6 +14,9 @@ interface Sheet {
 }
 
 const sheetStore = createStore<Sheet | null>(null)
+
+/** C'è un menu o un dialogo aperto: i tasti rapidi della pagina stanno fermi. */
+export const sheetOpen = () => sheetStore.get() !== null
 const toastStore = createStore<{ id: number; text: string } | null>(null)
 
 function dismissSheet() {

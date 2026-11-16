@@ -620,6 +620,41 @@ button:disabled {
   color: var(--accent);
 }
 
+/* Selezione col mouse (selection.ts): clic seleziona, doppio clic suona, l'icona diventa ▶ al passaggio. */
+.row.selectable {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.row.selected,
+.row.selected:hover {
+  background: color-mix(in srgb, var(--accent-fill) 24%, transparent);
+}
+
+.row.selectable .row-icon {
+  position: relative;
+}
+
+.row-play {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  border-radius: inherit;
+  background: var(--raised);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.row.selectable:hover .row-play {
+  display: grid;
+}
+
+.row-play:hover {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
 .row-text {
   min-width: 0;
   display: flex;

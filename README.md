@@ -43,13 +43,18 @@ cd android && ./gradlew installDebug
   dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando, import dei
   vecchi `.m3u`. Sul Mac un brano o una cartella si trascina direttamente su una playlist della
   barra laterale (o su "Nuova playlist").
+- **Selezione (Mac)**: come in Spotify, un clic seleziona un brano, Maiusc+clic l'intervallo,
+  Cmd+clic aggiunge o toglie, Cmd+A tutti, Esc o un clic nel vuoto nessuno. Il doppio clic (o il
+  ▶ che compare sull'icona) fa partire il brano. Trascinando un brano selezionato si porta dietro
+  tutta la selezione. Sul telefono il tocco fa partire il brano, come prima.
 - **Gruppi di playlist**: apribili con la freccia, nella barra laterale e nella pagina Playlist.
   pCloud non ha cartelle di playlist, quindi il gruppo sta nel nome: "CCCP ▸ Epica etica" è
   "Epica etica" nel gruppo "CCCP" (un file a parte non si potrebbe leggere: `gettextfile` è
   riservato a pcloud.com). Quali gruppi sono aperti lo ricorda ogni dispositivo per conto suo.
   Sul Mac una playlist si trascina su un gruppo (o su "Nuovo gruppo", "Fuori dai gruppi"), sia
   nella barra laterale sia nella pagina Playlist.
-- **Lettore**: coda, casuale, ripeti, ripresa da dove eri rimasto. I formati che Chrome non suona
+- **Lettore**: coda, casuale, ripeti, ripresa da dove eri rimasto. Barra spaziatrice per pausa e
+  ripresa (anche subito dopo un clic; "/" porta alla ricerca). I formati che Chrome non suona
   (wma, alac…) non partono: la transcodifica mp3 di pCloud (`getaudiolink`) ha lo stesso blocco.
   A schermo spento e con i tasti multimediali funziona grazie alla Media Session di Chrome.
 

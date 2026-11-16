@@ -2,12 +2,16 @@ import { useDeferredValue, useMemo } from 'react'
 import { libraryStore, searchLibrary, toQueueItem, tracksUnder } from '../lib/library'
 import { playerStore, playItems } from '../lib/player'
 import { routeHref } from '../lib/router'
+import type { QItem } from '../lib/queue'
 import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
+import { useSelection } from './selection'
 import { tracksLabel } from './text'
+
+const noItems: QItem[] = []
 
 export function SearchView({ query }: { query: string }) {
   const library = useStore(libraryStore, (state) => state.library)
@@ -20,6 +24,7 @@ export function SearchView({ query }: { query: string }) {
     const result = searchLibrary(library, deferredQuery)
     return { ...result, items: result.tracks.map((track) => toQueueItem(library, track)) }
   }, [library, deferredQuery])
+  const selection = useSelection(found?.items ?? noItems, query.trim())
 
   if (!found) return <Notice loading title="Leggo la libreria da pCloud…" />
   if (!query.trim()) return <Notice title="Cerca nella libreria" body="Titolo, artista, album o nome della cartella." />
@@ -68,7 +73,9 @@ export function SearchView({ query }: { query: string }) {
                 playing={playing}
                 onPlay={() => playItems(found.items, i)}
                 onMenu={() => openTrackMenu(item, { parent: found.tracks[i].parent })}
-                draggable
+                drag={() => selection.dragFrom(i)}
+                selected={selection.rows.has(i)}
+                onSelect={selection.select && ((event) => selection.select?.(i, event))}
               />
             ))}
           </ul>

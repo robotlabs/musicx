@@ -15,6 +15,7 @@ import { openTrackMenu, queueMenuItems } from './actions'
 import { Icon } from './icons'
 import { dragTracks } from './drag'
 import { Notice, TrackRow } from './parts'
+import { useSelection } from './selection'
 import { openMenu } from './sheets'
 import { tracksLabel } from './text'
 
@@ -43,8 +44,9 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
   const currentId = useStore(playerStore, (state) => state.items[state.index]?.id)
   const playing = useStore(playerStore, (state) => state.playing)
   const items = useMemo(() => queueItems(library, folder.tracks), [library, folder])
-
   const isRoot = folder.id === library.rootId
+  const selection = useSelection(items, isRoot ? 'Libreria' : folder.name)
+
   const trail = folderTrail(library, folder.id)
   const everything = (target: Folder) => queueItems(library, tracksUnder(library, target.id))
 
@@ -121,7 +123,9 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
             playing={playing}
             onPlay={() => playItems(items, i)}
             onMenu={() => openTrackMenu(item)}
-            draggable
+            drag={() => selection.dragFrom(i)}
+            selected={selection.rows.has(i)}
+            onSelect={selection.select && ((event) => selection.select?.(i, event))}
           />
         ))}
       </ul>

@@ -14,7 +14,8 @@ export type Dragged =
 /** Cosa si sta trascinando adesso, se qualcosa. */
 export const dragStore = createStore<Dragged | null>(null)
 
-const canDrag = typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches
+/** Mouse o trackpad (non il tocco): si può trascinare e selezionare più righe. */
+export const finePointer = typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches
 
 /** I brani si aggiungono (copia), le playlist si spostano: l'effetto del bersaglio deve combaciare, o il rilascio viene rifiutato. */
 const effectOf = (dragged: Dragged) => (dragged.kind === 'tracks' ? 'copy' : 'move')
@@ -44,7 +45,7 @@ function start(event: DragEvent<HTMLElement>, dragged: Dragged, ghostText: strin
 
 /** Proprietà per un elemento che trascina brani. `get` viene chiamata solo quando parte il trascinamento. */
 export function dragTracks(get: () => { ids: number[]; label: string } | null) {
-  if (!canDrag) return {}
+  if (!finePointer) return {}
   return {
     draggable: true,
     onDragStart: (event: DragEvent<HTMLElement>) => {
@@ -62,7 +63,7 @@ export function dragTracks(get: () => { ids: number[]; label: string } | null) {
 
 /** Proprietà per un elemento che trascina una playlist (verso un gruppo). */
 export function dragPlaylist(list: Playlist) {
-  if (!canDrag) return {}
+  if (!finePointer) return {}
   return {
     draggable: true,
     onDragStart: (event: DragEvent<HTMLElement>) => {

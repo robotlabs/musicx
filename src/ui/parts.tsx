@@ -1,6 +1,6 @@
 // Pezzi riusati da più viste: riga di un brano, messaggi a tutta pagina.
 
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import type { QItem } from '../lib/queue'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
@@ -25,16 +25,44 @@ export function TrackRow(props: {
   leading?: ReactNode
   className?: string
   style?: CSSProperties
-  /** Se dato, la riga si può trascinare sulle playlist della barra laterale. */
-  draggable?: boolean
+  /** Se dato, la riga si può trascinare sulle playlist della barra laterale: dà i brani da trascinare. */
+  drag?: () => { ids: number[]; label: string } | null
+  /** Col mouse il clic seleziona (vedi selection.ts) e il doppio clic suona. Senza, il clic suona. */
+  onSelect?: (event: MouseEvent) => void
+  selected?: boolean
 }) {
-  const { item, active } = props
-  const drag = props.draggable ? dragTracks(() => ({ ids: [item.id], label: item.title })) : {}
+  const { item, active, onSelect } = props
+  const drag = props.drag ? dragTracks(props.drag) : {}
+  const className = ['row', active && 'active', props.selected && 'selected', onSelect && 'selectable', props.className]
   return (
-    <li className={`row${active ? ' active' : ''}${props.className ? ` ${props.className}` : ''}`} style={props.style} {...drag}>
+    <li className={className.filter(Boolean).join(' ')} style={props.style} {...drag}>
       {props.leading}
-      <button className="row-main" onClick={props.onPlay}>
-        <span className="row-icon">{active ? <Bars moving={props.playing} /> : <Icon name="music" size={18} />}</span>
+      <button
+        className="row-main"
+        aria-pressed={onSelect ? Boolean(props.selected) : undefined}
+        // Il clic da tastiera (Invio) ha detail 0: lì il brano parte comunque.
+        onClick={(event) => (onSelect && event.detail > 0 ? onSelect(event) : props.onPlay())}
+        onDoubleClick={onSelect && props.onPlay}
+      >
+        <span
+          className="row-icon"
+          // Col mouse, l'icona diventa ▶ e fa partire il brano con un clic solo.
+          onClick={
+            onSelect &&
+            ((event) => {
+              event.stopPropagation()
+              if (event.detail === 1) props.onPlay()
+            })
+          }
+          onDoubleClick={onSelect && ((event) => event.stopPropagation())}
+        >
+          {active ? <Bars moving={props.playing} /> : <Icon name="music" size={18} />}
+          {onSelect && !active && (
+            <span className="row-play" title="Riproduci">
+              <Icon name="play" size={16} />
+            </span>
+          )}
+        </span>
         <span className="row-text">
           <span className="row-title">{item.title}</span>
           {item.sub && <span className="row-sub">{item.sub}</span>}

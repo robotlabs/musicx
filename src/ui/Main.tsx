@@ -20,7 +20,8 @@ import { addTracksTo } from './actions'
 import { dragPlaylist, useDropTargets } from './drag'
 import { DropZones } from './DropZones'
 import { moveToGroup, newGroupFlow, openGroupMenu } from './playlistActions'
-import { confirmAction, createPlaylistFlow, openMenu, SheetHost, toast } from './sheets'
+import { isTyping } from './selection'
+import { confirmAction, createPlaylistFlow, openMenu, SheetHost, sheetOpen, toast } from './sheets'
 import { tracksLabel } from './text'
 
 async function logout() {
@@ -67,18 +68,36 @@ function SearchBox({ route }: { route: Route }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const typing = event.target instanceof HTMLElement && event.target.closest('input, textarea, [contenteditable]')
-      if (typing) return
+      if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return
       if (event.key === '/') {
         event.preventDefault()
         input.current?.focus()
-      } else if (event.key === ' ' && !(event.target instanceof HTMLElement && event.target.closest('button, a'))) {
+      } else if (event.key === ' ') {
+        // Come in Spotify: lo spazio mette in pausa o riprende, anche subito dopo un clic su un brano o un pulsante
+        // (altrimenti premerebbe di nuovo quel pulsante). Solo chi è arrivato al pulsante con Tab usa lo spazio
+        // per premerlo; nei menu aperti lo spazio resta ai menu.
+        const target = event.target instanceof Element ? event.target : null
+        if (sheetOpen() || (tabbing && target?.closest('button, a, [role=button]'))) return
         event.preventDefault()
-        toggle()
+        if (!event.repeat) toggle()
       }
     }
+    // Ci si muove con la tastiera da quando si preme Tab, col mouse da quando si clicca.
+    let tabbing = false
+    const onTab = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') tabbing = true
+    }
+    const onPointer = () => {
+      tabbing = false
+    }
+    window.addEventListener('keydown', onTab, true)
+    window.addEventListener('pointerdown', onPointer, true)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onTab, true)
+      window.removeEventListener('pointerdown', onPointer, true)
+      window.removeEventListener('keydown', onKey)
+    }
   }, [])
 
   return (

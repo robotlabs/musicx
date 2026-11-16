@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react'
 import { playerStore, playItems, playShuffled } from '../lib/player'
 import { setGroupOpen } from '../lib/openGroups'
 import { loadPlaylist, movePlaylistTrack, playlistsStore, removeFromPlaylist, type PlaylistTrack } from '../lib/playlists'
@@ -7,6 +7,7 @@ import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
+import { useSelection } from './selection'
 import { playlistMenuItems, playlistSubtitle } from './playlistActions'
 import { openMenu, toast } from './sheets'
 import { errorText, tracksLabel } from './text'
@@ -132,6 +133,9 @@ const PlaylistRow = memo(function PlaylistRow(props: {
   playing: boolean
   shift: number
   dragged: boolean
+  selected: boolean
+  onSelect?: (index: number, event: MouseEvent) => void
+  dragFrom: (index: number) => { ids: number[]; label: string } | null
   onPlay: (index: number) => void
   onMenu: (index: number) => void
   onGrab: (index: number, event: PointerEvent<HTMLElement>) => void
@@ -149,11 +153,20 @@ const PlaylistRow = memo(function PlaylistRow(props: {
       style={style}
       onPlay={() => props.onPlay(index)}
       onMenu={() => props.onMenu(index)}
+      drag={() => props.dragFrom(index)}
+      selected={props.selected}
+      onSelect={props.onSelect && ((event) => props.onSelect?.(index, event))}
       leading={
         <span
           className="grip"
           role="button"
           aria-label="Trascina per riordinare"
+          // La maniglia riordina: non deve far partire il trascinamento della riga verso le playlist.
+          draggable
+          onDragStart={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+          }}
           onPointerDown={(event) => props.onGrab(index, event)}
           onPointerMove={props.onDrag}
           onPointerUp={props.onDrop}
@@ -165,6 +178,8 @@ const PlaylistRow = memo(function PlaylistRow(props: {
     />
   )
 })
+
+const noTracks: PlaylistTrack[] = []
 
 export function PlaylistView({ id }: { id: number }) {
   const list = useStore(playlistsStore, (state) => state.lists.find((item) => item.id === id))
@@ -190,6 +205,7 @@ export function PlaylistView({ id }: { id: number }) {
     [id],
   )
   const { drag, start, move, end } = useDragReorder(tracks?.length ?? 0, reorder)
+  const selection = useSelection(tracks ?? noTracks, list?.title ?? 'Playlist')
 
   const play = useCallback((index: number) => playItems(tracksRef.current ?? [], index), [])
   const menu = useCallback(
@@ -277,6 +293,9 @@ export function PlaylistView({ id }: { id: number }) {
             playing={playing}
             shift={shiftOf(drag, index)}
             dragged={drag?.from === index}
+            selected={selection.rows.has(index)}
+            onSelect={selection.select}
+            dragFrom={selection.dragFrom}
             onPlay={play}
             onMenu={menu}
             onGrab={start}
