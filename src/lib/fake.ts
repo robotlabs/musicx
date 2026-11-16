@@ -2,6 +2,7 @@
 // brani sintetici di pochi secondi e playlist in memoria. Non finisce nella build di produzione.
 
 import { setMemoryAuth } from './auth'
+import { readTags, writeTags } from './id3'
 import { setNamespace } from './env'
 import { setLocalSourceEnabled } from './localSource'
 import { setLoginTransport } from './passwordLogin'
@@ -11,7 +12,7 @@ let nextFolderId = 100
 let nextFileId = 1000
 const files = new Map<number, RawMeta>()
 
-type Tags = Pick<RawMeta, 'artist' | 'album' | 'title'>
+type Tags = Pick<RawMeta, 'artist' | 'album' | 'title' | 'trackno'>
 
 function file(name: string, tags: Tags = {}): RawMeta {
   return { name, isfolder: false, fileid: nextFileId++, ...tags }
@@ -118,6 +119,37 @@ function toneUrl(fileid: number, seconds: number): string {
   return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }))
 }
 
+/** File caricati con "Modifica info": li si riscarica uguali. */
+const uploaded = new Map<number, Uint8Array>()
+
+/**
+ * Per scaricare un mp3 (e riscriverne i tag) serve un mp3 vero: tag dai metadati finti più un frame
+ * audio muto. Per ascoltarlo resta il WAV con la nota.
+ */
+function downloadLink(fileid: number) {
+  const meta = files.get(fileid)
+  if (!meta) throw new PCloudError(2009, 'File not found.')
+  let bytes = uploaded.get(fileid)
+  if (!bytes) {
+    const frame = new Uint8Array(417)
+    frame.set([0xff, 0xfb, 0x90, 0x64])
+    const tags = { title: meta.title ?? '', artist: meta.artist ?? '', album: meta.album ?? '', track: String(meta.trackno ?? '') }
+    bytes = writeTags(frame, tags)
+  }
+  return { result: 0, hosts: ['fake'], path: '/', url: URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>])) }
+}
+
+async function upload(params: Params, file: { name: string; data: Blob } | undefined) {
+  const meta = [...files.values()].find((entry) => entry.parentfolderid === Number(params.folderid) && entry.name === file?.name)
+  if (!meta || !file) throw new PCloudError(2005, 'Directory does not exist.')
+  const bytes = new Uint8Array(await file.data.arrayBuffer())
+  const tags = readTags(bytes)
+  uploaded.set(meta.fileid!, bytes)
+  // Come pCloud: rilegge subito i tag del file nuovo.
+  Object.assign(meta, { title: tags.title, artist: tags.artist, album: tags.album, trackno: tags.track ? Number.parseInt(tags.track, 10) : undefined })
+  return { result: 0, fileids: [meta.fileid], metadata: [{ ...meta }] }
+}
+
 function link(fileid: number, transcoded: boolean, seconds: number) {
   const meta = files.get(fileid)
   if (!meta) throw new PCloudError(2009, 'File not found.')
@@ -168,7 +200,7 @@ export function installFake(trackSeconds = 6, signedIn = true) {
   setLocalSourceEnabled(false)
   setMemoryAuth(signedIn ? { token: 'fake', host: 'eapi.pcloud.com', kind: 'session' } : null)
   installFakeLogin()
-  setTransport(async (method, params) => {
+  setTransport(async (method, params, _timeout, file) => {
     await new Promise((resolve) => setTimeout(resolve, 120))
     switch (method) {
       case 'userinfo':
@@ -178,7 +210,15 @@ export function installFake(trackSeconds = 6, signedIn = true) {
       case 'listfolder':
         return { result: 0, metadata: tree }
       case 'getfilelink':
-        return link(Number(params.fileid), false, trackSeconds)
+        return params.forcedownload ? downloadLink(Number(params.fileid)) : link(Number(params.fileid), false, trackSeconds)
+      case 'uploadfile':
+        return upload(params, file)
+      case 'renamefile': {
+        const meta = files.get(Number(params.fileid))
+        if (!meta) throw new PCloudError(2009, 'File not found.')
+        meta.name = String(params.toname)
+        return { result: 0, metadata: { ...meta } }
+      }
       case 'getaudiolink':
         return link(Number(params.fileid), true, trackSeconds)
       case 'collection_list':

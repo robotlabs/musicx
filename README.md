@@ -53,6 +53,14 @@ cd android && ./gradlew installDebug
   riservato a pcloud.com). Quali gruppi sono aperti lo ricorda ogni dispositivo per conto suo.
   Sul Mac una playlist si trascina su un gruppo (o su "Nuovo gruppo", "Fuori dai gruppi"), sia
   nella barra laterale sia nella pagina Playlist.
+- **Modifica info**: dal menu ⋯ di un brano (anche quello che sta suonando, nella barra del lettore)
+  si cambiano titolo, artista, album, numero di traccia e nome del file; dal ⋯ di una cartella, o
+  con più brani selezionati sul Mac, artista e album di tutti insieme. I tag si scrivono dentro il
+  file (`src/lib/id3.ts`, solo mp3: gli altri formati si possono solo rinominare): musicx lo scarica
+  (da rclone sul Mac, dal lato nativo nell'app Android), riscrive il tag lasciando intatti audio,
+  copertina e altri campi, e lo ricarica con `uploadfile` al posto del vecchio. pCloud tiene lo
+  stesso fileid (il brano resta nelle playlist), rilegge subito i tag e conserva la versione
+  precedente. Da Chrome sul telefono si può solo rinominare.
 - **Lettore**: coda, casuale, ripeti, ripresa da dove eri rimasto. Barra spaziatrice per pausa e
   ripresa (anche subito dopo un clic; "/" porta alla ricerca). I formati che Chrome non suona
   (wma, alac…) non partono: la transcodifica mp3 di pCloud (`getaudiolink`) ha lo stesso blocco.

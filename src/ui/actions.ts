@@ -5,6 +5,7 @@ import { enqueue, playNext } from '../lib/player'
 import { addToPlaylist, playlistsStore } from '../lib/playlists'
 import type { QItem } from '../lib/queue'
 import { navigate } from '../lib/router'
+import { editTracksInfo } from './editInfo'
 import { choosePlaylist, openMenu, toast, type MenuItem } from './sheets'
 import { errorText, tracksLabel } from './text'
 
@@ -37,12 +38,28 @@ export function queueMenuItems(items: QItem[]): MenuItem[] {
   ]
 }
 
-/** Menu ⋯ di un brano. `parent` è la cartella che lo contiene, se si vuole la voce per andarci. */
-export function openTrackMenu(item: QItem, options: { parent?: number | null; extra?: MenuItem[] } = {}) {
+/** "Modifica info" se i brani sono nella libreria (una playlist può contenere file di altre cartelle). */
+const editItem = (ids: number[]): MenuItem[] => {
+  const library = libraryStore.get().library
+  if (!ids.length || !ids.every((id) => library?.tracks.has(id))) return []
+  return [{ label: ids.length > 1 ? `Modifica info di ${tracksLabel(ids.length)}` : 'Modifica info', icon: 'edit', onSelect: () => editTracksInfo(ids) }]
+}
+
+/**
+ * Menu ⋯ di un brano. `parent` è la cartella che lo contiene, se si vuole la voce per andarci.
+ * Con `selected` (più brani selezionati col mouse, compreso questo) il menu vale per tutti.
+ */
+export function openTrackMenu(item: QItem, options: { parent?: number | null; extra?: MenuItem[]; selected?: QItem[] | null } = {}) {
+  const selected = options.selected
+  if (selected && selected.length > 1) {
+    const ids = selected.map((entry) => entry.id)
+    openMenu(`${tracksLabel(selected.length)} selezionati`, [...queueMenuItems(selected), ...editItem(ids)])
+    return
+  }
   const items = queueMenuItems([item])
   const parent = options.parent
   if (parent != null && libraryStore.get().library?.folders.has(parent)) {
     items.push({ label: 'Vai alla cartella', icon: 'folder', onSelect: () => navigate({ name: 'folder', id: parent }) })
   }
-  openMenu(item.title, [...items, ...(options.extra ?? [])], item.sub)
+  openMenu(item.title, [...items, ...editItem([item.id]), ...(options.extra ?? [])], item.sub)
 }

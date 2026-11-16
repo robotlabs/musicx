@@ -12,6 +12,7 @@ import { playerStore, playItems, playShuffled } from '../lib/player'
 import { navigate, routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
+import { editTracksInfo } from './editInfo'
 import { Icon } from './icons'
 import { dragTracks } from './drag'
 import { Notice, TrackRow } from './parts'
@@ -57,6 +58,9 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
         { label: 'Riproduci', icon: 'play', onSelect: () => playItems(everything(target)) },
         { label: 'Riproduci in ordine casuale', icon: 'shuffle', onSelect: () => playShuffled(everything(target)) },
         ...queueMenuItems(everything(target)),
+        ...(target.id === library.rootId
+          ? []
+          : [{ label: 'Modifica info dei brani', icon: 'edit' as const, onSelect: () => editTracksInfo(tracksUnder(library, target.id)) }]),
       ],
       tracksLabel(target.total),
     )
@@ -122,7 +126,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
             active={item.id === currentId}
             playing={playing}
             onPlay={() => playItems(items, i)}
-            onMenu={() => openTrackMenu(item)}
+            onMenu={() => openTrackMenu(item, { selected: selection.selectedWith(i)?.map((row) => items[row]) })}
             drag={() => selection.dragFrom(i)}
             selected={selection.rows.has(i)}
             onSelect={selection.select && ((event) => selection.select?.(i, event))}

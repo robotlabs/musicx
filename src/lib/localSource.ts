@@ -92,6 +92,16 @@ export async function localUrl(trackId: number): Promise<string | null> {
   return path && (await localSourceUp()) ? `${LOCAL_SOURCE}/${path}` : null
 }
 
+/** Perché da qui non si riesce a leggere i file (per riscriverne i tag), detto semplice. */
+export async function whyNoFiles(): Promise<string> {
+  if (isAndroidBrowser) return "Da Chrome pCloud non lascia leggere i file: sul telefono usa l'app musicx per Android."
+  if (!enabled) return "pCloud non dà i file a una pagina web: si può fare dal Mac (con rclone) o dall'app per Android."
+  if ((await access()) === 'denied') {
+    return 'Chrome non lascia parlare musicx con rclone: riattiva il permesso "rete locale" nelle impostazioni del sito.'
+  }
+  return 'Sul Mac i file passano da rclone, che ora non risponde.'
+}
+
 /** pCloud ha rifiutato il link perché la richiesta viene da una pagina web. */
 export const isRefererError = (error: unknown) =>
   error instanceof PCloudError && (error.code === 7010 || /referer/i.test(error.message))

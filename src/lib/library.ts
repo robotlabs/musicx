@@ -27,6 +27,8 @@ export interface Track {
   title?: string
   artist?: string
   album?: string
+  /** Numero di traccia dal tag ("3" o "3/12"). */
+  track?: string
 }
 
 export interface Library {
@@ -52,6 +54,14 @@ export const stripExtension = (file: string) => file.replace(/\.[^.]+$/, '')
 
 const clean = (value: string | undefined) => value?.trim() || undefined
 
+/** I campi del tag come li legge pCloud. */
+export const trackTags = (raw: RawMeta): Pick<Track, 'title' | 'artist' | 'album' | 'track'> => ({
+  title: clean(raw.title),
+  artist: clean(raw.artist),
+  album: clean(raw.album),
+  track: clean(raw.trackno === undefined || raw.trackno === 0 ? undefined : String(raw.trackno)),
+})
+
 /** Trasforma la risposta ricorsiva di `listfolder` nell'indice. Le cartelle senza musica spariscono. */
 export function buildLibrary(root: RawMeta, builtAt = Date.now()): Library {
   const folders = new Map<number, Folder>()
@@ -74,9 +84,7 @@ export function buildLibrary(root: RawMeta, builtAt = Date.now()): Library {
           id: child.fileid,
           parent: id,
           name: child.name,
-          title: clean(child.title),
-          artist: clean(child.artist),
-          album: clean(child.album),
+          ...trackTags(child),
         })
         folder.tracks.push(child.fileid)
       }
@@ -290,6 +298,39 @@ export async function initLibrary() {
   libraryStore.set({ status: 'ready', library: cached, error: null, refreshing: false })
   if (Date.now() - cached.builtAt > LIBRARY_MAX_AGE_MS) void refreshLibrary()
 }
+
+/**
+ * Aggiorna dei brani nell'indice (dopo averne cambiato tag o nome) senza rileggere tutta la libreria.
+ * La libreria diventa un oggetto nuovo, così liste e ricerca si ricalcolano.
+ */
+export function updateTracks(changes: Map<number, Partial<Omit<Track, 'id' | 'parent'>>>) {
+  const library = libraryStore.get().library
+  if (!library || !changes.size) return
+  const tracks = new Map(library.tracks)
+  const folders = new Map(library.folders)
+  for (const [id, change] of changes) {
+    const track = tracks.get(id)
+    if (!track) continue
+    tracks.set(id, { ...track, ...change })
+    if (change.name !== undefined && change.name !== track.name) {
+      const folder = folders.get(track.parent)
+      if (folder) {
+        const sorted = [...folder.tracks].sort((a, b) => collator.compare(tracks.get(a)!.name, tracks.get(b)!.name))
+        folders.set(folder.id, { ...folder, tracks: sorted })
+      }
+    }
+  }
+  const next = { ...library, tracks, folders }
+  libraryStore.set((state) => ({ ...state, library: next }))
+  // Con tante modifiche di fila l'indice (decine di migliaia di brani) si salva una volta sola alla fine.
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    const current = libraryStore.get().library
+    if (current) void writeCache(current)
+  }, 1500)
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 export async function clearLibrary() {
   libraryStore.set({ status: 'idle', library: null, error: null, refreshing: false })

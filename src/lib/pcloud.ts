@@ -15,7 +15,12 @@ export class PCloudError extends Error {
 }
 
 export type Params = Record<string, string | number | undefined>
-export type Transport = (method: string, params: Params, timeoutMs: number) => Promise<unknown>
+/** Un file da caricare (solo per `uploadfile`). */
+export interface Upload {
+  name: string
+  data: Blob
+}
+export type Transport = (method: string, params: Params, timeoutMs: number, upload?: Upload) => Promise<unknown>
 
 /** Codici con cui pCloud dice che il token non vale più. */
 const AUTH_ERRORS = new Set([1000, 2000, 2094, 2095])
@@ -23,7 +28,7 @@ const AUTH_ERRORS = new Set([1000, 2000, 2094, 2095])
 /** Metodi che pCloud rifiuta alle pagine web ("Referrer is restricted to pcloud.com"). */
 const LINK_METHODS = new Set(['getfilelink', 'getaudiolink'])
 
-const httpTransport: Transport = async (method, params, timeoutMs) => {
+const httpTransport: Transport = async (method, params, timeoutMs, upload) => {
   const auth = authStore.get().auth
   if (!auth) throw new PCloudError(1000, 'Accesso richiesto.')
 
@@ -43,7 +48,15 @@ const httpTransport: Transport = async (method, params, timeoutMs) => {
       // Nell'app Android i link ai brani si chiedono dal lato nativo: alla pagina pCloud li rifiuta.
       reply = (await nativeGetJson(url, timeoutMs)) as typeof reply
     } else {
-      const response = await fetch(url, { signal: abort.signal, cache: 'no-store', referrerPolicy: 'no-referrer' })
+      const body = upload && new FormData()
+      body?.append('file', upload!.data, upload!.name)
+      const response = await fetch(url, {
+        method: body ? 'POST' : 'GET',
+        body,
+        signal: abort.signal,
+        cache: 'no-store',
+        referrerPolicy: 'no-referrer',
+      })
       reply = { status: response.status, data: response.ok ? await response.json() : { result: 0 } }
     }
     const { status, data } = reply
@@ -65,9 +78,9 @@ export function setTransport(next: Transport) {
   transport = next
 }
 
-export async function call<T>(method: string, params: Params = {}, timeoutMs = 30_000): Promise<T> {
+export async function call<T>(method: string, params: Params = {}, timeoutMs = 30_000, upload?: Upload): Promise<T> {
   try {
-    return (await transport(method, params, timeoutMs)) as T
+    return (await transport(method, params, timeoutMs, upload)) as T
   } catch (error) {
     if (error instanceof PCloudError && AUTH_ERRORS.has(error.code)) expireAuth()
     throw error
@@ -85,6 +98,8 @@ export interface RawMeta {
   artist?: string
   album?: string
   title?: string
+  /** Numero di traccia letto dal tag (pCloud lo manda come numero o come testo). */
+  trackno?: number | string
   /** Solo dentro una playlist: posizione (da 1). */
   position?: number
 }
@@ -112,14 +127,38 @@ export async function listTree(path: string): Promise<RawMeta> {
   return data.metadata
 }
 
-/** Link al file originale. Vale qualche ora e solo dall'indirizzo IP che l'ha chiesto. */
-export async function fileLink(fileid: number): Promise<string> {
-  return linkUrl(await call<LinkResponse>('getfilelink', { fileid }))
+/**
+ * Link al file originale. Vale qualche ora e solo dall'indirizzo IP che l'ha chiesto.
+ * `download` lo chiede per scaricarlo (riscriverne i tag) invece che per ascoltarlo.
+ */
+export async function fileLink(fileid: number, download = false): Promise<string> {
+  return linkUrl(await call<LinkResponse>('getfilelink', { fileid, forcedownload: download ? 1 : undefined }))
 }
 
 /** Link allo stesso brano transcodificato in mp3 da pCloud (per i formati che il browser non suona). */
 export async function audioLink(fileid: number, kbps = 256): Promise<string> {
   return linkUrl(await call<LinkResponse>('getaudiolink', { fileid, abitrate: kbps }))
+}
+
+/**
+ * Carica un file nella cartella. Se ce n'è già uno con lo stesso nome lo sostituisce tenendo lo
+ * stesso fileid (quindi resta nelle playlist) e pCloud conserva la versione vecchia tra le revisioni.
+ * pCloud rilegge subito i tag: i metadati restituiti hanno già titolo, artista e album nuovi.
+ */
+export async function uploadFile(folderid: number, name: string, data: Uint8Array): Promise<RawMeta> {
+  const reply = await call<{ metadata: RawMeta[] }>('uploadfile', { folderid, nopartial: 1 }, 300_000, {
+    name,
+    data: new Blob([data as Uint8Array<ArrayBuffer>], { type: 'audio/mpeg' }),
+  })
+  return reply.metadata[0]
+}
+
+/**
+ * Rinomina un file restando nella sua cartella (stesso fileid). Attenzione: se esiste già un file
+ * con quel nome pCloud lo sostituisce, quindi chi chiama deve controllare prima.
+ */
+export async function renameFile(fileid: number, toname: string): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('renamefile', { fileid, toname })).metadata
 }
 
 export async function accountEmail(): Promise<string> {

@@ -15,6 +15,16 @@ export const isAndroidBrowser = !isNativeApp && typeof navigator !== 'undefined'
 /** Dove si scarica l'app Android. */
 export const ANDROID_APP_URL = 'https://github.com/robotlabs/musicx/releases/latest/download/musicx.apk'
 
+/** Scarica un file dal lato nativo (per riscriverne i tag). Il ponte di Capacitor lo passa in base64. */
+export async function nativeGetBytes(url: string, timeoutMs: number): Promise<Uint8Array> {
+  const response = await CapacitorHttp.get({ url, connectTimeout: timeoutMs, readTimeout: timeoutMs, responseType: 'arraybuffer' })
+  if (response.status < 200 || response.status > 299) throw new Error(`pCloud ha risposto ${response.status}.`)
+  const data: unknown = response.data
+  if (data instanceof ArrayBuffer) return new Uint8Array(data)
+  if (typeof data === 'string') return Uint8Array.from(atob(data), (char) => char.charCodeAt(0))
+  throw new Error('Il file scaricato non è leggibile.')
+}
+
 /** GET fatta dal lato nativo dell'app; restituisce stato HTTP e JSON già letto. */
 export async function nativeGetJson(url: string, timeoutMs: number): Promise<{ status: number; data: unknown }> {
   const response = await CapacitorHttp.get({

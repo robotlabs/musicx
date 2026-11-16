@@ -1119,7 +1119,67 @@ button.danger:not(.primary) {
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
+}
+
+/* Modifica info */
+
+.info-form {
+  gap: 12px;
+}
+
+.info-file {
+  margin-top: -8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field > span:first-child {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dim);
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.field input:disabled {
+  opacity: 0.5;
+}
+
+.field-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-file em {
+  flex: none;
+  font-style: normal;
+  color: var(--dim);
+}
+
+.info-note {
+  font-size: 13px;
+}
+
+.dialog p.info-error {
+  color: var(--danger);
+}
+
+.info-progress {
+  margin-right: auto;
+  font-size: 14px;
+  color: var(--dim);
 }
 
 .dialog-actions button {

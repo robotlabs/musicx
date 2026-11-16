@@ -19,6 +19,16 @@ const sheetStore = createStore<Sheet | null>(null)
 export const sheetOpen = () => sheetStore.get() !== null
 const toastStore = createStore<{ id: number; text: string } | null>(null)
 
+/** Apre un pannello qualsiasi (sostituisce quello aperto). */
+export function showSheet(node: ReactNode, onDismiss?: () => void) {
+  sheetStore.set({ node, onDismiss })
+}
+
+/** Chiude il pannello senza chiamare `onDismiss`. */
+export function closeSheet() {
+  sheetStore.set(null)
+}
+
 function dismissSheet() {
   const sheet = sheetStore.get()
   sheetStore.set(null)

@@ -22,6 +22,8 @@ export interface Selection {
   select?: (index: number, event: MouseEvent) => void
   /** Cosa trascinare partendo dalla riga `index`: tutta la selezione se la riga ne fa parte, se no solo lei. */
   dragFrom: (index: number) => { ids: number[]; label: string } | null
+  /** Le righe selezionate (in ordine) se `index` è una di più righe selezionate, se no null. */
+  selectedWith: (index: number) => number[] | null
 }
 
 export const isTyping = (target: EventTarget | null) =>
@@ -80,18 +82,22 @@ export function useSelection(items: readonly { id: number; title: string }[], la
     })
   }, [])
 
-  const dragFrom = useCallback((index: number) => {
-    const { items, label, picked } = latest.current
-    const item = items[index]
-    if (!item) return null
-    if (picked.rows.has(index) && picked.rows.size > 1) {
-      const ids = [...picked.rows]
-        .sort((a, b) => a - b)
-        .flatMap((row) => (items[row] ? [items[row].id] : []))
-      return { ids, label }
-    }
-    return { ids: [item.id], label: item.title }
+  const selectedWith = useCallback((index: number) => {
+    const { items, picked } = latest.current
+    if (!picked.rows.has(index) || picked.rows.size < 2) return null
+    return [...picked.rows].filter((row) => row < items.length).sort((a, b) => a - b)
   }, [])
 
-  return { rows: picked.rows, select: finePointer ? select : undefined, dragFrom }
+  const dragFrom = useCallback(
+    (index: number) => {
+      const { items, label } = latest.current
+      const item = items[index]
+      if (!item) return null
+      const rows = selectedWith(index)
+      return rows ? { ids: rows.map((row) => items[row].id), label } : { ids: [item.id], label: item.title }
+    },
+    [selectedWith],
+  )
+
+  return { rows: picked.rows, select: finePointer ? select : undefined, dragFrom, selectedWith }
 }

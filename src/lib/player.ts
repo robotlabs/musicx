@@ -378,6 +378,14 @@ export function clearQueue() {
   unload()
 }
 
+/** Cambia come si vedono dei brani già in coda (dopo aver modificato titolo, artista o nome del file). */
+export function updateQueueItems(update: (item: QItem) => QItem) {
+  const fix = (items: QItem[]) => items.map(update)
+  playerStore.set((state) => ({ ...state, items: fix(state.items), original: state.original && fix(state.original) }))
+  const item = currentItem()
+  if (item) showMetadata(item)
+}
+
 export const toggleShuffle = () => playerStore.set((state) => ({ ...state, ...toggleQueueShuffle(state) }))
 export const cycleRepeat = () => patch({ repeat: nextRepeat(playerStore.get().repeat) })
 

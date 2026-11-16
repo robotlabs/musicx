@@ -203,6 +203,14 @@ export function ungroup(group: string) {
   return renameMany(listsWhere((list) => list.group === group).map((list) => ({ id: list.id, name: joinName(null, list.title) })))
 }
 
+/** Cambia come si vedono dei brani nelle playlist già caricate. */
+export function updatePlaylistTracks(update: (track: PlaylistTrack) => PlaylistTrack) {
+  playlistsStore.set((state) => ({
+    ...state,
+    tracks: Object.fromEntries(Object.entries(state.tracks).map(([id, tracks]) => [id, tracks?.map(update)])),
+  }))
+}
+
 const setTracks = (id: number, change: (tracks: PlaylistTrack[]) => PlaylistTrack[]) =>
   playlistsStore.set((state) => {
     const tracks = state.tracks[id]

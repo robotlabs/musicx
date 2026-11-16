@@ -1,6 +1,6 @@
 import { clearQueue, jumpTo, playerStore, removeFromQueue } from '../lib/player'
 import { useStore } from '../lib/store'
-import { addToPlaylistFlow } from './actions'
+import { addToPlaylistFlow, openTrackMenu } from './actions'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
 import { useSelection } from './selection'
@@ -56,7 +56,9 @@ export function QueueView() {
               selected={selection.rows.has(position)}
               onSelect={selection.select && ((event) => selection.select?.(position, event))}
               onMenu={() =>
-                openMenu(
+                selection.selectedWith(position)
+                  ? openTrackMenu(item, { selected: selection.selectedWith(position)!.map((row) => items[row]) })
+                  : openMenu(
                   item.title,
                   [
                     { label: 'Aggiungi a playlist…', icon: 'plus', onSelect: () => void addToPlaylistFlow([item.id]) },

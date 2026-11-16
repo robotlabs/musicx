@@ -206,12 +206,15 @@ export function PlaylistView({ id }: { id: number }) {
   )
   const { drag, start, move, end } = useDragReorder(tracks?.length ?? 0, reorder)
   const selection = useSelection(tracks ?? noTracks, list?.title ?? 'Playlist')
+  const { selectedWith } = selection
 
   const play = useCallback((index: number) => playItems(tracksRef.current ?? [], index), [])
   const menu = useCallback(
     (index: number) => {
       const track = tracksRef.current?.[index]
       if (!track) return
+      const selected = selectedWith(index)
+      if (selected) return openTrackMenu(track, { selected: selected.map((row) => tracksRef.current![row]) })
       openTrackMenu(track, {
         parent: track.parent,
         extra: [
@@ -224,7 +227,7 @@ export function PlaylistView({ id }: { id: number }) {
         ],
       })
     },
-    [id],
+    [id, selectedWith],
   )
 
   if (error) {

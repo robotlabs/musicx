@@ -72,7 +72,12 @@ export function SearchView({ query }: { query: string }) {
                 active={item.id === currentId}
                 playing={playing}
                 onPlay={() => playItems(found.items, i)}
-                onMenu={() => openTrackMenu(item, { parent: found.tracks[i].parent })}
+                onMenu={() =>
+                  openTrackMenu(item, {
+                    parent: found.tracks[i].parent,
+                    selected: selection.selectedWith(i)?.map((row) => found.items[row]),
+                  })
+                }
                 drag={() => selection.dragFrom(i)}
                 selected={selection.rows.has(i)}
                 onSelect={selection.select && ((event) => selection.select?.(i, event))}

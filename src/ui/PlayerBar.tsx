@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { cycleRepeat, next, playerStore, previous, progressStore, seek, toggle, toggleShuffle } from '../lib/player'
+import { libraryStore } from '../lib/library'
 import { useStore } from '../lib/store'
+import { openTrackMenu } from './actions'
 import { Icon } from './icons'
 import { clock } from './text'
 
@@ -82,6 +84,15 @@ export function PlayerBar() {
         >
           <Icon name="repeat" size={18} />
           {player.repeat === 'one' && <span className="badge">1</span>}
+        </button>
+        {/* Il menu del brano che sta suonando: playlist, cartella, modifica info. */}
+        <button
+          className="icon-button extra"
+          aria-label={`Azioni per ${item.title}`}
+          title="Altre azioni"
+          onClick={() => openTrackMenu(item, { parent: libraryStore.get().library?.tracks.get(item.id)?.parent })}
+        >
+          <Icon name="more" size={18} />
         </button>
       </div>
       <Seek />
