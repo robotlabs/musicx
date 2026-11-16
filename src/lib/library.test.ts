@@ -102,9 +102,21 @@ describe('ordine dei brani in una cartella', () => {
     ])
   })
 
-  it('con album diversi resta in ordine alfabetico', () => {
-    const mixed = folder('Ale Music', [vasco('Zeta.mp3', 1, 'Uno'), vasco('Alfa.mp3', 9, 'Due')])
-    expect(names(mixed)).toEqual(['Alfa.mp3', 'Zeta.mp3'])
+  it('con album diversi e numeri che si ripetono resta in ordine alfabetico', () => {
+    const mixed = folder('Ale Music', [vasco('Zeta.mp3', 1, 'Uno'), vasco('Beta.mp3', 1, 'Due'), vasco('Alfa.mp3', 9, 'Due')])
+    expect(names(mixed)).toEqual(['Alfa.mp3', 'Beta.mp3', 'Zeta.mp3'])
+    const unnumbered = folder('Misto', [vasco('Zeta.mp3', 1, 'Uno'), vasco('Alfa.mp3', undefined, 'Due')])
+    expect(names(unnumbered)).toEqual(['Alfa.mp3', 'Zeta.mp3'])
+  })
+
+  it('con album diversi e numeri tutti diversi (un ordine scelto) segue i numeri', () => {
+    const chosen = folder('Preferite', [vasco('Alfa.mp3', 2, 'Due'), vasco('Zeta.mp3', 1, 'Uno'), vasco('Beta.mp3', 3, 'Tre')])
+    expect(names(chosen)).toEqual(['Zeta.mp3', 'Alfa.mp3', 'Beta.mp3'])
+  })
+
+  it('senza album segue il numero nel nome', () => {
+    const plain = folder('Demo', [file('10 Fine.mp3'), file('2 Inizio.mp3'), file('Bonus.mp3')])
+    expect(names(plain)).toEqual(['2 Inizio.mp3', '10 Fine.mp3', 'Bonus.mp3'])
   })
 
   it('cambiando numero o nome il brano si sposta subito', () => {

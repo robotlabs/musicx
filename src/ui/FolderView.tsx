@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
+import { canReorder, moveFolderTrack, orderStore } from '../lib/folderOrder'
 import {
   folderTrail,
   libraryStore,
@@ -16,9 +17,10 @@ import { editTracksInfo } from './editInfo'
 import { Icon } from './icons'
 import { dragTracks } from './drag'
 import { Notice, TrackRow } from './parts'
+import { Grip, shiftOf, useDragReorder } from './reorder'
 import { useSelection } from './selection'
-import { openMenu } from './sheets'
-import { tracksLabel } from './text'
+import { confirmAction, openMenu, toast } from './sheets'
+import { errorText, tracksLabel } from './text'
 
 export function FolderView({ id }: { id: number | null }) {
   const { status, library, error } = useStore(libraryStore)
@@ -47,6 +49,28 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
   const items = useMemo(() => queueItems(library, folder.tracks), [library, folder])
   const isRoot = folder.id === library.rootId
   const selection = useSelection(items, isRoot ? 'Libreria' : folder.name)
+
+  // Trascinando la maniglia l'ordine diventa il numero di traccia scritto nei file (folderOrder.ts).
+  const reorderable = useMemo(() => canReorder(folder.id), [library, folder])
+  const saving = useStore(orderStore, (state) => (state?.folder === folder.id ? state : null))
+  const folderId = folder.id
+  const reorder = useCallback(
+    (from: number, to: number) =>
+      void moveFolderTrack(
+        folderId,
+        from,
+        to,
+        (files) =>
+          confirmAction(
+            'Riordinare la cartella?',
+            `Per salvare quest'ordine scrivo il numero di traccia in ${files} file: ognuno va scaricato e ricaricato su pCloud, e ci vorrà un po'.`,
+            'Riordina',
+          ),
+        (problem) => toast(`L'ordine non è stato salvato: ${errorText(problem)}`),
+      ),
+    [folderId],
+  )
+  const { drag, start, move, end } = useDragReorder(reorderable ? items.length : 0, reorder)
 
   const trail = folderTrail(library, folder.id)
   const everything = (target: Folder) => queueItems(library, tracksUnder(library, target.id))
@@ -79,7 +103,10 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
       )}
       <header className="view-head">
         <h1>{isRoot ? 'Libreria' : folder.name}</h1>
-        <p className="dim">{tracksLabel(folder.total)}</p>
+        <p className="dim">
+          {tracksLabel(folder.total)}
+          {saving && ` · Salvo l'ordine nei file: ${Math.min(saving.done + 1, saving.total)} di ${saving.total}…`}
+        </p>
         {folder.total > 0 && (
           <div className="head-actions">
             <button className="pill primary" onClick={() => playItems(everything(folder))}>
@@ -95,7 +122,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
         )}
       </header>
       {folder.total === 0 && <Notice title="Nessun brano qui" body="In questa cartella di pCloud non c'è musica." />}
-      <ul className="rows">
+      <ul className={`rows${drag ? ' reordering' : ''}`}>
         {folder.folders.map((childId) => {
           const child = library.folders.get(childId)!
           return (
@@ -130,6 +157,9 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
             drag={() => selection.dragFrom(i)}
             selected={selection.rows.has(i)}
             onSelect={selection.select && ((event) => selection.select?.(i, event))}
+            className={drag?.from === i ? 'dragged' : undefined}
+            style={drag ? { transform: `translateY(${shiftOf(drag, i)}px)` } : undefined}
+            leading={reorderable && <Grip index={i} onGrab={start} onDrag={move} onDrop={end} />}
           />
         ))}
       </ul>

@@ -88,8 +88,20 @@ function show(id: number, change: Partial<Track>) {
   updatePlaylistTracks((item) => (item.id === id ? { ...item, ...looks } : item))
 }
 
-/** Salva le modifiche di un brano: prima i tag (nel file), poi il nome. */
-export async function saveTrackInfo(id: number, change: InfoChange): Promise<void> {
+let saving: Promise<unknown> = Promise.resolve()
+
+/**
+ * Salva le modifiche di un brano: prima i tag (nel file), poi il nome. Un salvataggio alla volta:
+ * due caricamenti dello stesso file insieme (per esempio "Modifica info" mentre si salva l'ordine
+ * della cartella) si annullerebbero a vicenda.
+ */
+export function saveTrackInfo(id: number, change: InfoChange): Promise<void> {
+  const run = saving.then(() => save(id, change))
+  saving = run.catch(() => {})
+  return run
+}
+
+async function save(id: number, change: InfoChange): Promise<void> {
   const track = libraryStore.get().library?.tracks.get(id)
   if (!track) throw new Error('Il brano non è nella libreria.')
 
