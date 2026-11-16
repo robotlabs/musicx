@@ -5,6 +5,7 @@
 import { NATIVE_EXT } from '../config'
 import { storageKey } from './env'
 import { extensionOf } from './library'
+import { forgetLocalSource, isLocalUrl, isRefererError, localUrl, whyNotPlayable } from './localSource'
 import { audioLink, fileLink, PCloudError } from './pcloud'
 import {
   appendToQueue,
@@ -66,7 +67,9 @@ async function resolveLink(item: QItem, transcode: boolean): Promise<string> {
   const key = linkKey(item, transcode)
   const cached = links.get(key)
   if (cached && Date.now() - cached.at < LINK_TTL_MS) return cached.url
-  const url = transcode ? await audioLink(item.id) : await fileLink(item.id)
+  // Sul Mac il file originale arriva da rclone; i link di pCloud servono solo dove funzionano.
+  const local = transcode ? null : await localUrl(item.id)
+  const url = local ?? (transcode ? await audioLink(item.id) : await fileLink(item.id))
   links.set(key, { url, at: Date.now() })
   return url
 }
@@ -93,6 +96,11 @@ async function load(options: { autoplay: boolean; at?: number; stage?: Stage }) 
     if (options.autoplay) await audio.play()
   } catch (error) {
     if (sequence !== loadSequence) return
+    if (isRefererError(error)) {
+      const reason = await whyNotPlayable(item, needsTranscode(item))
+      if (sequence !== loadSequence) return
+      return reason.fatal ? stop(reason.message) : giveUp(reason.message)
+    }
     if (error instanceof PCloudError) return giveUp(error.message)
     if (error instanceof DOMException && error.name === 'NotAllowedError') {
       // Il browser vuole un gesto dell'utente prima di suonare.
@@ -117,6 +125,8 @@ function onMediaError(message: string) {
   const item = currentItem()
   if (!item) return
   links.delete(linkKey(item, transcoding))
+  // rclone spento, o permesso di Chrome tolto: si ricontrolla prima di riprovare.
+  if (isLocalUrl(audio.src)) forgetLocalSource()
   const at = audio.currentTime || resumeAt
   const autoplay = playerStore.get().playing
   if (stage === 0) return void load({ autoplay, at, stage: 1 })
@@ -124,16 +134,18 @@ function onMediaError(message: string) {
   giveUp(message)
 }
 
+/** Si ferma e spiega perché. */
+function stop(message: string) {
+  switching = false
+  patch({ playing: false, loading: false, error: message })
+}
+
 /** Brano irrecuperabile: passa al successivo, ma si ferma se falliscono in fila (es. rete assente). */
 function giveUp(message: string) {
   failures += 1
   const state = playerStore.get()
   const next = nextIndex(state, false)
-  if (failures >= MAX_FAILURES || next === null || next === state.index || !state.playing) {
-    switching = false
-    patch({ playing: false, loading: false, error: message })
-    return
-  }
+  if (failures >= MAX_FAILURES || next === null || next === state.index || !state.playing) return stop(message)
   patch({ index: next, error: message })
   void load({ autoplay: true })
 }

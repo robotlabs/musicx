@@ -3,6 +3,7 @@
 
 import { setMemoryAuth } from './auth'
 import { setNamespace } from './env'
+import { setLocalSourceEnabled } from './localSource'
 import { setLoginTransport } from './passwordLogin'
 import { PCloudError, setTransport, type Params, type RawMeta } from './pcloud'
 
@@ -164,6 +165,7 @@ function installFakeLogin() {
 /** `signedIn = false` parte dalla schermata di accesso (con ?fake&login). */
 export function installFake(trackSeconds = 6, signedIn = true) {
   setNamespace('musicx-fake')
+  setLocalSourceEnabled(false)
   setMemoryAuth(signedIn ? { token: 'fake', host: 'eapi.pcloud.com', kind: 'session' } : null)
   installFakeLogin()
   setTransport(async (method, params) => {

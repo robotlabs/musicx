@@ -1,8 +1,17 @@
 # musicx
 
-Player musicale personale. Una web app installabile (PWA) che legge la musica direttamente da
-pCloud (`/rob/music`): niente server, niente rclone, niente Mac acceso. Sul Mac e su Android si
-installa da Chrome e si usa come un'app.
+Player musicale personale. Una web app installabile (PWA) che legge libreria e playlist
+direttamente da pCloud (`/rob/music`). Sul Mac e su Android si installa da Chrome e si usa come
+un'app.
+
+**L'audio non arriva da pCloud.** pCloud non dà i link ai file alle app web: `getfilelink`,
+`getaudiolink` e tutti gli altri metodi che danno link rispondono "Invalid link referer" a chi non
+è pcloud.com, anche senza Referer. Sul Mac i brani passano quindi da rclone, il servizio launchd
+`com.roberto.rclone-music-http` (`rclone serve http pcloud:rob/music` su `127.0.0.1:8620`); la
+prima volta Chrome chiede il permesso di accedere ai servizi del computer ("rete locale"). Sul
+telefono per ora i brani non suonano. Se rclone smette di rispondere perché pCloud gli ha revocato
+l'accesso, si ricollega con `rclone config reconnect pcloud:` e poi
+`launchctl kickstart -k gui/$(id -u)/com.roberto.rclone-music-http`.
 
 - **Libreria**: tutto l'albero di `/rob/music` letto in una chiamata e salvato nel browser.
   Navigazione per cartelle e ricerca istantanea su titolo, artista, album e nome cartella.
@@ -17,8 +26,8 @@ installa da Chrome e si usa come un'app.
   Sul Mac una playlist si trascina su un gruppo (o su "Nuovo gruppo", "Fuori dai gruppi"), sia
   nella barra laterale sia nella pagina Playlist.
 - **Lettore**: coda, casuale, ripeti, ripresa da dove eri rimasto. I formati che Chrome non suona
-  (wma, alac…) passano dalla transcodifica mp3 di pCloud. A schermo spento e con i tasti
-  multimediali funziona grazie alla Media Session di Chrome.
+  (wma, alac…) non partono: la transcodifica mp3 di pCloud (`getaudiolink`) ha lo stesso blocco.
+  A schermo spento e con i tasti multimediali funziona grazie alla Media Session di Chrome.
 
 ## Sviluppo
 
@@ -66,7 +75,8 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 ## Scelte da non rifare
 
 - Niente mount di pCloud sul Mac (pCloud Drive, rclone nfsmount, FUSE, WebDAV): bloccavano Finder
-  e VLC in modo irrecuperabile. Il vecchio setup basato su `rclone serve http` è in `legacy/`.
+  e VLC in modo irrecuperabile. Il vecchio player basato su `rclone serve http` è in `legacy/`;
+  il servizio rclone invece resta acceso, perché sul Mac l'audio di musicx passa da lì.
 - Niente Electron / React Native / Capacitor: Chrome gestisce da solo audio in background,
   notifica e lock screen per una PWA installata.
 
@@ -76,6 +86,7 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 - `src/lib/auth.ts`, `src/lib/passwordLogin.ts` – accesso OAuth e con email e password
 - `src/lib/library.ts` – indice della libreria, ricerca, cache in IndexedDB
 - `src/lib/player.ts` – elemento audio, coda, Media Session, tentativi di recupero
+- `src/lib/localSource.ts` – i brani da rclone sul Mac, permesso "rete locale", messaggi d'errore
 - `src/lib/queue.ts` – logica della coda (pura, testata)
 - `src/lib/playlists.ts` – playlist pCloud, modifiche in fila una alla volta
 - `src/lib/m3u.ts` – import dei vecchi `.m3u`

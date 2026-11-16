@@ -7,6 +7,12 @@ export const MUSIC_ROOT = '/rob/music'
  */
 export const PCLOUD_CLIENT_ID = ''
 
+/**
+ * Dove risponde rclone sul Mac (`rclone serve http pcloud:rob/music`, servizio launchd
+ * com.roberto.rclone-music-http). Da lì passano i brani: pCloud non dà i link ai file alle app web.
+ */
+export const LOCAL_SOURCE = 'http://127.0.0.1:8620'
+
 /** Estensioni trattate come musica. */
 export const AUDIO_EXT = new Set([
   'mp3', 'flac', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'wav',
