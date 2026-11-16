@@ -13,7 +13,7 @@ import {
   type Playlist,
   type PlaylistGroup,
 } from '../lib/playlists'
-import { navigate } from '../lib/router'
+import { navigate, routeStore } from '../lib/router'
 import { askText, choosePlaylists, confirmAction, createPlaylistFlow, openMenu, toast, type MenuItem } from './sheets'
 import { errorText, tracksLabel } from './text'
 
@@ -74,6 +74,9 @@ export async function deletePlaylistFlow(list: Playlist): Promise<boolean> {
   if (!sure) return false
   try {
     await deletePlaylist(list.id)
+    // Se era aperta, la sua pagina non c'è più.
+    const route = routeStore.get()
+    if (route.name === 'playlist' && route.id === list.id) navigate({ name: 'playlists' }, { replace: true })
     return true
   } catch (error) {
     toast(errorText(error))

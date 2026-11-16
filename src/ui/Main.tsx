@@ -19,7 +19,7 @@ import { SearchView } from './SearchView'
 import { addTracksTo } from './actions'
 import { dragPlaylist, useDropTargets } from './drag'
 import { DropZones } from './DropZones'
-import { moveToGroup, newGroupFlow, openGroupMenu } from './playlistActions'
+import { moveToGroup, newGroupFlow, openGroupMenu, openPlaylistMenu } from './playlistActions'
 import { isTyping } from './selection'
 import { confirmAction, createPlaylistFlow, openMenu, SheetHost, sheetOpen, toast } from './sheets'
 import { tracksLabel } from './text'
@@ -176,6 +176,11 @@ function SidePlaylists({ route }: { route: Route }) {
         .filter(Boolean)
         .join(' ')}
       title={list.title}
+      // Tasto destro: lo stesso menu del ⋯ (sposta, rinomina, elimina).
+      onContextMenu={(event) => {
+        event.preventDefault()
+        openPlaylistMenu(list)
+      }}
       {...dragPlaylist(list)}
       {...(tracks
         ? target(`p${list.id}`, () => void addTracksTo(list.id, tracks.ids))

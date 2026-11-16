@@ -56,7 +56,15 @@ function groupTarget(targets: Targets, group: string) {
 function PlaylistRow({ list, targets }: { list: Playlist; targets: Targets }) {
   const drop = list.group ? groupTarget(targets, list.group) : { props: {}, over: false }
   return (
-    <li className={`row${list.group ? ' nested' : ''}`} {...dragPlaylist(list)} {...drop.props}>
+    <li
+      className={`row${list.group ? ' nested' : ''}`}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        openPlaylistMenu(list)
+      }}
+      {...dragPlaylist(list)}
+      {...drop.props}
+    >
       <a className="row-main" href={routeHref({ name: 'playlist', id: list.id })}>
         <span className="row-icon folder">
           <Icon name="list" size={18} />
