@@ -4,7 +4,7 @@ import { playerStore, playItems } from '../lib/player'
 import { routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
-import { dragSource } from './dragTracks'
+import { dragTracks } from './drag'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
 import { tracksLabel } from './text'
@@ -37,7 +37,7 @@ export function SearchView({ query }: { query: string }) {
               <li
                 className="row"
                 key={folder.id}
-                {...dragSource(() => {
+                {...dragTracks(() => {
                   const library = libraryStore.get().library
                   return library ? { ids: tracksUnder(library, folder.id), label: folder.name } : null
                 })}

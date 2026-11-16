@@ -14,7 +14,9 @@ import { navigate, routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { Icon } from './icons'
 import { Notice } from './parts'
-import { newGroupFlow, openGroupMenu, openPlaylistMenu, playlistCount } from './playlistActions'
+import { dragPlaylist, useDropTargets } from './drag'
+import { DropZones } from './DropZones'
+import { moveToGroup, newGroupFlow, openGroupMenu, openPlaylistMenu, playlistCount } from './playlistActions'
 import { createPlaylistFlow, toast } from './sheets'
 import { errorText, tracksLabel } from './text'
 
@@ -37,9 +39,24 @@ async function importM3u(file: File) {
   }
 }
 
-function PlaylistRow({ list, nested = false }: { list: Playlist; nested?: boolean }) {
+type Targets = ReturnType<typeof useDropTargets>
+
+/** Rilasciare la playlist trascinata nel gruppo, se non ci sta già. */
+function intoGroup({ dragged }: Targets, group: string) {
+  return dragged?.kind === 'playlist' && dragged.group !== group ? () => moveToGroup([dragged.id], group) : null
+}
+
+/** Le playlist di un gruppo accettano una playlist trascinata come il gruppo stesso. */
+function groupTarget(targets: Targets, group: string) {
+  const key = `g${group}`
+  const onDrop = intoGroup(targets, group)
+  return { props: targets.target(key, onDrop), over: onDrop !== null && targets.over === key }
+}
+
+function PlaylistRow({ list, targets }: { list: Playlist; targets: Targets }) {
+  const drop = list.group ? groupTarget(targets, list.group) : { props: {}, over: false }
   return (
-    <li className={`row${nested ? ' nested' : ''}`}>
+    <li className={`row${list.group ? ' nested' : ''}`} {...dragPlaylist(list)} {...drop.props}>
       <a className="row-main" href={routeHref({ name: 'playlist', id: list.id })}>
         <span className="row-icon folder">
           <Icon name="list" size={18} />
@@ -56,11 +73,12 @@ function PlaylistRow({ list, nested = false }: { list: Playlist; nested?: boolea
   )
 }
 
-function GroupRows({ group, open }: { group: PlaylistGroup; open: boolean }) {
+function GroupRows({ group, open, targets }: { group: PlaylistGroup; open: boolean; targets: Targets }) {
   const tracks = group.lists.reduce((sum, list) => sum + list.count, 0)
+  const drop = groupTarget(targets, group.name)
   return (
     <>
-      <li className={`row group-row${open ? ' open' : ''}`}>
+      <li className={`row group-row${open ? ' open' : ''}${drop.over ? ' drop-over' : ''}`} {...drop.props}>
         <button className="row-main" aria-expanded={open} onClick={() => toggleGroup(group.name)}>
           <span className="disclosure">
             <Icon name="chevron" size={16} />
@@ -79,7 +97,7 @@ function GroupRows({ group, open }: { group: PlaylistGroup; open: boolean }) {
           <Icon name="more" />
         </button>
       </li>
-      {open && group.lists.map((list) => <PlaylistRow key={list.id} list={list} nested />)}
+      {open && group.lists.map((list) => <PlaylistRow key={list.id} list={list} targets={targets} />)}
     </>
   )
 }
@@ -89,6 +107,7 @@ export function PlaylistsView() {
   const open = useStore(openGroupsStore)
   const { groups, loose } = useMemo(() => groupPlaylists(lists), [lists])
   const fileInput = useRef<HTMLInputElement>(null)
+  const targets = useDropTargets()
 
   const create = async () => {
     const id = await createPlaylistFlow()
@@ -134,12 +153,13 @@ export function PlaylistsView() {
       {loaded && !error && lists.length === 0 && (
         <Notice title="Ancora nessuna playlist" body='Creane una, oppure usa "Aggiungi a playlist" dal menu ⋯ di un brano o di una cartella.' />
       )}
+      <DropZones targets={targets} />
       <ul className="rows">
         {groups.map((group) => (
-          <GroupRows key={group.name} group={group} open={isOpen(open, group.name)} />
+          <GroupRows key={group.name} group={group} open={isOpen(open, group.name)} targets={targets} />
         ))}
         {loose.map((list) => (
-          <PlaylistRow key={list.id} list={list} />
+          <PlaylistRow key={list.id} list={list} targets={targets} />
         ))}
       </ul>
     </>

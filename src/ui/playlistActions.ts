@@ -23,8 +23,8 @@ const groupNames = () => groupPlaylists(playlistsStore.get().lists).groups.map((
 
 export const playlistCount = (count: number) => (count === 1 ? '1 playlist' : `${count} playlist`)
 
-/** Sposta le playlist in un gruppo e lo apre, così si vede dove sono finite. */
-function moveTo(ids: number[], group: string | null) {
+/** Sposta le playlist in un gruppo (o fuori, con null) e lo apre, così si vede dove sono finite. */
+export function moveToGroup(ids: number[], group: string | null) {
   if (group) setGroupOpen(tidyName(group), true)
   report(movePlaylistsToGroup(ids, group))
 }
@@ -34,12 +34,18 @@ async function askGroupName(title: string, initial = '') {
   return name && tidyName(name) ? tidyName(name) : null
 }
 
+/** Chiede il nome di un nuovo gruppo e ci sposta le playlist. */
+export async function newGroupWith(ids: number[]) {
+  const name = await askGroupName('Nuovo gruppo')
+  if (name) moveToGroup(ids, name)
+}
+
 /** Nuovo gruppo: nome, poi le playlist da metterci (un gruppo esiste solo se ne contiene almeno una). */
 export async function newGroupFlow() {
   const name = await askGroupName('Nuovo gruppo')
   if (!name) return
   const ids = await choosePlaylists(`Playlist da mettere in "${name}"`, { confirm: 'Crea gruppo' })
-  if (ids?.length) moveTo(ids, name)
+  if (ids?.length) moveToGroup(ids, name)
 }
 
 function moveToGroupMenu(list: Playlist) {
@@ -47,16 +53,13 @@ function moveToGroupMenu(list: Playlist) {
     {
       label: 'Nuovo gruppo…',
       icon: 'plus',
-      onSelect: async () => {
-        const name = await askGroupName('Nuovo gruppo')
-        if (name) moveTo([list.id], name)
-      },
+      onSelect: () => void newGroupWith([list.id]),
     },
     ...groupNames()
       .filter((name) => name !== list.group)
-      .map((name): MenuItem => ({ label: name, icon: 'folder', onSelect: () => moveTo([list.id], name) })),
+      .map((name): MenuItem => ({ label: name, icon: 'folder', onSelect: () => moveToGroup([list.id], name) })),
   ]
-  if (list.group) items.push({ label: 'Fuori dai gruppi', icon: 'close', onSelect: () => moveTo([list.id], null) })
+  if (list.group) items.push({ label: 'Fuori dai gruppi', icon: 'close', onSelect: () => moveToGroup([list.id], null) })
   openMenu('Sposta in gruppo', items, list.title)
 }
 
@@ -112,7 +115,7 @@ export function openGroupMenu(group: PlaylistGroup) {
             confirm: 'Aggiungi',
             exclude: group.lists.map((list) => list.id),
           })
-          if (ids?.length) moveTo(ids, group.name)
+          if (ids?.length) moveToGroup(ids, group.name)
         },
       },
       {

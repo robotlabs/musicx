@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { MUSIC_ROOT } from '../config'
 import { clearAuth } from '../lib/auth'
 import { clearLibrary, initLibrary, libraryStore, refreshLibrary } from '../lib/library'
@@ -16,8 +16,9 @@ import { PlaylistView } from './PlaylistView'
 import { QueueView } from './QueueView'
 import { SearchView } from './SearchView'
 import { addTracksTo } from './actions'
-import { dragStore, takeDrag, type DragPayload } from './dragTracks'
-import { newGroupFlow, openGroupMenu } from './playlistActions'
+import { dragPlaylist, useDropTargets } from './drag'
+import { DropZones } from './DropZones'
+import { moveToGroup, newGroupFlow, openGroupMenu } from './playlistActions'
 import { confirmAction, createPlaylistFlow, openMenu, SheetHost, toast } from './sheets'
 import { tracksLabel } from './text'
 
@@ -113,103 +114,83 @@ function SidePlaylists({ route }: { route: Route }) {
   }, [currentId, currentGroup])
 
   // Brani trascinati dalla pagina: ogni playlist li accetta, un gruppo chiuso si apre se ci si ferma sopra.
-  const dragging = useStore(dragStore) !== null
-  const [over, setOver] = useState<string | null>(null)
+  // Una playlist trascinata: la accettano i gruppi (l'intestazione e le playlist che contiene).
+  const targets = useDropTargets()
+  const { dragged, over, target } = targets
+  const tracks = dragged?.kind === 'tracks' ? dragged : null
+  const moving = dragged?.kind === 'playlist' ? dragged : null
   const openTimer = useRef(0)
   useEffect(() => {
-    if (dragging) return
-    setOver(null)
-    clearTimeout(openTimer.current)
-  }, [dragging])
+    if (!dragged) clearTimeout(openTimer.current)
+  }, [dragged])
 
-  const leave = (key: string) => (event: DragEvent<HTMLElement>) => {
-    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
-    if (key.startsWith('g')) clearTimeout(openTimer.current)
-    setOver((current) => (current === key ? null : current))
-  }
+  /** Rilasciare una playlist nel gruppo, se non ci sta già. */
+  const intoGroup = (group: string) =>
+    moving && moving.group !== group ? () => moveToGroup([moving.id], group) : null
 
-  const dropOn = (key: string, onDrop: (payload: DragPayload) => void) =>
-    dragging
-      ? {
-          onDragEnter: (event: DragEvent) => {
-            event.preventDefault()
-            setOver(key)
-          },
-          onDragOver: (event: DragEvent) => {
-            event.preventDefault()
-            event.dataTransfer.dropEffect = 'copy'
-          },
-          onDragLeave: leave(key),
-          onDrop: (event: DragEvent) => {
-            event.preventDefault()
-            setOver(null)
-            const payload = takeDrag()
-            if (payload) onDrop(payload)
-          },
-        }
-      : {}
-
-  const openWhileDragging = (group: string, expanded: boolean) =>
-    dragging
-      ? {
-          onDragEnter: () => {
-            setOver(`g${group}`)
+  const groupTarget = (group: string, expanded: boolean) =>
+    tracks
+      ? target(`g${group}`, null, {
+          enter: () => {
             clearTimeout(openTimer.current)
             if (!expanded) openTimer.current = window.setTimeout(() => setGroupOpen(group, true), 500)
           },
-          onDragLeave: leave(`g${group}`),
-        }
-      : {}
+          leave: () => clearTimeout(openTimer.current),
+        })
+      : target(`g${group}`, intoGroup(group))
 
-  const newPlaylistWith = async (payload: DragPayload) => {
-    const id = await createPlaylistFlow(payload.ids.length > 1 ? payload.label : '')
-    if (id !== null) await addTracksTo(id, payload.ids)
+  const newPlaylistWith = async (ids: number[], label: string) => {
+    const id = await createPlaylistFlow(ids.length > 1 ? label : '')
+    if (id !== null) await addTracksTo(id, ids)
   }
 
-  const link = (list: Playlist, nested: boolean) => (
+  const link = (list: Playlist) => (
     <a
       key={list.id}
       href={routeHref({ name: 'playlist', id: list.id })}
-      className={[nested && 'nested', list.id === currentId && 'current', over === `p${list.id}` && 'drop-over']
+      className={[list.group && 'nested', list.id === currentId && 'current', over === `p${list.id}` && tracks && 'drop-over']
         .filter(Boolean)
         .join(' ')}
-      {...dropOn(`p${list.id}`, (payload) => void addTracksTo(list.id, payload.ids))}
+      {...dragPlaylist(list)}
+      {...(tracks
+        ? target(`p${list.id}`, () => void addTracksTo(list.id, tracks.ids))
+        : list.group
+          ? target(`g${list.group}`, intoGroup(list.group))
+          : {})}
     >
       {list.title}
     </a>
   )
 
   return (
-    <nav className={`side-lists${dragging ? ' dragging' : ''}`}>
-      {dragging && (
-        <div className={`side-drop-new${over === 'new' ? ' drop-over' : ''}`} {...dropOn('new', (payload) => void newPlaylistWith(payload))}>
-          <Icon name="plus" size={16} /> Nuova playlist
-        </div>
-      )}
+    <nav className={`side-lists${tracks ? ' dragging-tracks' : ''}`}>
+      <DropZones targets={targets} newPlaylistWith={(ids, label) => void newPlaylistWith(ids, label)} />
       {groups.map((group) => {
         const expanded = isOpen(open, group.name)
+        const key = `g${group.name}`
+        const highlight = over === key ? (tracks ? ' drop-hover' : intoGroup(group.name) ? ' drop-over' : '') : ''
         return (
           <Fragment key={group.name}>
             <button
-              className={`side-group${expanded ? ' open' : ''}${over === `g${group.name}` ? ' drop-hover' : ''}`}
+              className={`side-group${expanded ? ' open' : ''}${highlight}`}
               aria-expanded={expanded}
               onClick={() => toggleGroup(group.name)}
               onContextMenu={(event) => {
                 event.preventDefault()
                 openGroupMenu(group)
               }}
-              {...openWhileDragging(group.name, expanded)}
+              {...groupTarget(group.name, expanded)}
             >
               <span className="disclosure">
                 <Icon name="chevron" size={14} />
               </span>
               <span className="side-group-name">{group.name}</span>
             </button>
-            {expanded && group.lists.map((list) => link(list, true))}
+            {expanded && group.lists.map(link)}
           </Fragment>
         )
       })}
-      {loose.map((list) => link(list, false))}
+      {loose.map(link)}
     </nav>
   )
 }

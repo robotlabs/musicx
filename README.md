@@ -14,6 +14,8 @@ installa da Chrome e si usa come un'app.
   pCloud non ha cartelle di playlist, quindi il gruppo sta nel nome: "CCCP ▸ Epica etica" è
   "Epica etica" nel gruppo "CCCP" (un file a parte non si potrebbe leggere: `gettextfile` è
   riservato a pcloud.com). Quali gruppi sono aperti lo ricorda ogni dispositivo per conto suo.
+  Sul Mac una playlist si trascina su un gruppo (o su "Nuovo gruppo", "Fuori dai gruppi"), sia
+  nella barra laterale sia nella pagina Playlist.
 - **Lettore**: coda, casuale, ripeti, ripresa da dove eri rimasto. I formati che Chrome non suona
   (wma, alac…) passano dalla transcodifica mp3 di pCloud. A schermo spento e con i tasti
   multimediali funziona grazie alla Media Session di Chrome.

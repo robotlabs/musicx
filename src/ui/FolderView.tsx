@@ -13,7 +13,7 @@ import { navigate, routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
 import { Icon } from './icons'
-import { dragSource } from './dragTracks'
+import { dragTracks } from './drag'
 import { Notice, TrackRow } from './parts'
 import { openMenu } from './sheets'
 import { tracksLabel } from './text'
@@ -96,7 +96,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
             <li
               className="row"
               key={`folder-${childId}`}
-              {...dragSource(() => ({ ids: tracksUnder(library, childId), label: child.name }))}
+              {...dragTracks(() => ({ ids: tracksUnder(library, childId), label: child.name }))}
             >
               <a className="row-main" href={routeHref({ name: 'folder', id: childId })}>
                 <span className="row-icon folder">

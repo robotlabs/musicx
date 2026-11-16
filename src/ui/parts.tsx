@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from 'react'
 import type { QItem } from '../lib/queue'
-import { dragSource } from './dragTracks'
+import { dragTracks } from './drag'
 import { Icon } from './icons'
 
 /** Le tre barrette che segnano il brano in riproduzione (animate solo mentre suona). */
@@ -29,7 +29,7 @@ export function TrackRow(props: {
   draggable?: boolean
 }) {
   const { item, active } = props
-  const drag = props.draggable ? dragSource(() => ({ ids: [item.id], label: item.title })) : {}
+  const drag = props.draggable ? dragTracks(() => ({ ids: [item.id], label: item.title })) : {}
   return (
     <li className={`row${active ? ' active' : ''}${props.className ? ` ${props.className}` : ''}`} style={props.style} {...drag}>
       {props.leading}

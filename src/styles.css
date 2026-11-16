@@ -345,7 +345,7 @@ ul {
   height: 32px;
 }
 
-/* ---------- Trascinare brani sulle playlist ---------- */
+/* ---------- Trascinare brani sulle playlist e playlist nei gruppi ---------- */
 
 .drag-ghost {
   position: fixed;
@@ -363,31 +363,52 @@ ul {
 }
 
 .sidebar .side-lists a.drop-over,
-.side-drop-new.drop-over {
+.side-group.drop-over,
+.drop-zone.drop-over {
   background: var(--accent-fill);
   color: var(--on-accent);
+}
+
+.side-group.drop-over .disclosure {
+  color: inherit;
 }
 
 .side-group.drop-hover {
   background: var(--raised);
 }
 
-.side-lists.dragging a {
+.side-lists.dragging-tracks a {
   cursor: copy;
 }
 
-.side-drop-new {
+.row.drop-over {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* In cima alla lista, restano visibili anche scorrendo. */
+.drop-zones {
   position: sticky;
   top: 0;
   z-index: 1;
+  display: grid;
+  gap: 4px;
+  padding-bottom: 4px;
+  background: var(--surface);
+}
+
+.content .drop-zones {
+  background: var(--bg);
+  padding-top: 4px;
+}
+
+.drop-zone {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
   padding: 9px 10px;
   border: 1px dashed var(--accent);
   border-radius: 8px;
-  background: var(--surface);
   color: var(--accent);
   font-weight: 600;
 }
