@@ -6,7 +6,7 @@
 // una web app (gettextfile è riservato a pcloud.com); così invece i gruppi sono gli stessi su ogni
 // dispositivo e si vedono anche nell'app di pCloud.
 
-import { libraryStore, stripExtension } from './library'
+import { libraryStore, stripExtension, trackNumber } from './library'
 import { collections, type RawCollection, type RawMeta } from './pcloud'
 import type { QItem } from './queue'
 import { createStore } from './store'
@@ -266,6 +266,47 @@ export async function movePlaylistTrack(id: number, from: number, to: number) {
       const position = positionOf(targetId)
       if (item !== undefined && position !== undefined && item !== position) {
         await collections.move(id, movedId, item, position)
+      }
+    })
+  } finally {
+    await settle(id)
+  }
+}
+
+/**
+ * L'ordine "come nei dischi": gli album nell'ordine in cui compaiono nella playlist, dentro ogni album
+ * il numero di traccia (dal tag o dal nome del file). I brani fuori dalla libreria restano in fondo.
+ */
+export function trackNumberOrder(tracks: PlaylistTrack[]): PlaylistTrack[] {
+  const library = libraryStore.get().library
+  const albums = new Map<string, number>()
+  const keyed = tracks.map((item, index) => {
+    const track = library?.tracks.get(item.id)
+    const album = track ? (track.album ?? '').toLocaleLowerCase('it') : null
+    if (album !== null && !albums.has(album)) albums.set(album, albums.size)
+    return { item, index, album: album === null ? Infinity : albums.get(album)!, number: (track && trackNumber(track)) ?? Infinity }
+  })
+  keyed.sort((a, b) => a.album - b.album || a.number - b.number || a.index - b.index)
+  return keyed.map((entry) => entry.item)
+}
+
+/** Riordina la playlist per numero di traccia: subito a schermo, poi su pCloud un brano alla volta. */
+export async function sortPlaylistByTrackNumber(id: number) {
+  const tracks = playlistsStore.get().tracks[id]
+  if (!tracks) return
+  const wanted = trackNumberOrder(tracks).map((track) => track.id)
+  if (wanted.every((fileId, index) => tracks[index].id === fileId)) return
+  setTracks(id, (current) => trackNumberOrder(current))
+  try {
+    await serial(async () => {
+      // A ogni spostamento si rilegge l'ordine vero, senza fare ipotesi su come pCloud sposta gli altri.
+      let fresh = (await collections.details(id)).contents ?? []
+      for (const [index, fileId] of wanted.entries()) {
+        const order = [...fresh].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        const at = order.findIndex((item) => item.fileid === fileId)
+        if (at < 0 || at === index) continue
+        await collections.move(id, fileId, order[at].position ?? at + 1, order[index].position ?? index + 1)
+        fresh = (await collections.details(id)).contents ?? []
       }
     })
   } finally {

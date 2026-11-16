@@ -45,7 +45,8 @@ cd android && ./gradlew installDebug
   nuovo ordine diventa il numero di traccia scritto nei file, 1, 2, 3…: l'indice cambia subito e i
   file si riscrivono in sottofondo, solo quelli col numero cambiato (oltre 20 file chiede prima).
 - **Playlist**: sono le playlist native di pCloud (API `collection_*`), quindi le stesse su ogni
-  dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando, import dei
+  dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando o, dal ⋯,
+  "Ordina per numero di traccia" (album nell'ordine in cui compaiono, dentro il numero), import dei
   vecchi `.m3u`. Sul Mac un brano o una cartella si trascina direttamente su una playlist della
   barra laterale (o su "Nuova playlist").
 - **Selezione (Mac)**: come in Spotify, un clic seleziona un brano, Maiusc+clic l'intervallo,

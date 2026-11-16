@@ -1,7 +1,14 @@
 import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react'
 import { playerStore, playItems, playShuffled } from '../lib/player'
 import { setGroupOpen } from '../lib/openGroups'
-import { loadPlaylist, movePlaylistTrack, playlistsStore, removeFromPlaylist, type PlaylistTrack } from '../lib/playlists'
+import {
+  loadPlaylist,
+  movePlaylistTrack,
+  playlistsStore,
+  removeFromPlaylist,
+  sortPlaylistByTrackNumber,
+  type PlaylistTrack,
+} from '../lib/playlists'
 import { navigate } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
@@ -114,6 +121,15 @@ export function PlaylistView({ id }: { id: number }) {
       name,
       [
         ...(tracks.length ? queueMenuItems(tracks).slice(0, 2) : []),
+        ...(tracks.length > 1
+          ? [
+              {
+                label: 'Ordina per numero di traccia',
+                icon: 'sort' as const,
+                onSelect: () => void sortPlaylistByTrackNumber(id).catch((problem) => toast(errorText(problem))),
+              },
+            ]
+          : []),
         ...(list ? playlistMenuItems(list, () => navigate({ name: 'playlists' }, { replace: true })) : []),
       ],
       list ? playlistSubtitle(list) : tracksLabel(tracks.length),
