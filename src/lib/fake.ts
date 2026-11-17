@@ -51,8 +51,38 @@ const tree = folder('music', [
     folder('King Tubby', album('King Tubby', 'Dub From The Roots', ['Iyahta', 'Mine Field', 'Dub You Can Feel'])),
     folder('Città & Perché', [file('Già così è più bello.ogg'), file('Perché no.opus')]),
   ]),
+  // Vuota: l'indice non la mostra, ma ci si può spostare dentro qualcosa.
+  folder('Da sistemare', []),
   file('sciolto nella radice.mp3'),
 ])
+
+function findFolder(id: number, from: RawMeta = tree): RawMeta | null {
+  if (from.folderid === id) return from
+  for (const child of from.contents ?? []) {
+    const found = child.isfolder ? findFolder(id, child) : null
+    if (found) return found
+  }
+  return null
+}
+
+function folderOf(params: Params, name = 'folderid'): RawMeta {
+  const found = findFolder(Number(params[name]))
+  if (!found) throw new PCloudError(2005, 'Directory does not exist.')
+  return found
+}
+
+/** Toglie un file o una cartella da dove sta e lo mette in `target` (come pCloud: un file con lo stesso nome viene sostituito). */
+function moveInto(entry: RawMeta, target: RawMeta) {
+  const from = findFolder(entry.parentfolderid!)
+  if (from) from.contents = from.contents!.filter((child) => child !== entry)
+  const clash = target.contents!.find((child) => child.name === entry.name && !child.isfolder && !entry.isfolder)
+  if (clash) {
+    target.contents = target.contents!.filter((child) => child !== clash)
+    files.delete(clash.fileid!)
+  }
+  entry.parentfolderid = target.folderid
+  target.contents!.push(entry)
+}
 
 interface FakeCollection {
   id: number
@@ -207,8 +237,29 @@ export function installFake(trackSeconds = 6, signedIn = true) {
         return { result: 0, email: 'demo@example.com' }
       case 'logout':
         return { result: 0 }
-      case 'listfolder':
-        return { result: 0, metadata: tree }
+      case 'listfolder': {
+        if (params.recursive) return { result: 0, metadata: tree }
+        const found = folderOf(params)
+        const contents = found.contents!.filter((child) => !params.nofiles || child.isfolder).map((child) => ({ ...child, contents: undefined }))
+        return { result: 0, metadata: { ...found, contents } }
+      }
+      case 'renamefolder': {
+        const moving = folderOf(params)
+        const target = folderOf(params, 'tofolderid')
+        if (findFolder(target.folderid!, moving)) throw new PCloudError(2043, 'Cannot move a folder to a subfolder of itself.')
+        if (target.contents!.some((child) => child.name === moving.name)) throw new PCloudError(2004, 'File or folder alredy exists.')
+        moveInto(moving, target)
+        return { result: 0, metadata: { ...moving, contents: undefined } }
+      }
+      case 'createfolderifnotexists': {
+        const parent = folderOf(params)
+        let made = parent.contents!.find((child) => child.isfolder && child.name === String(params.name))
+        if (!made) {
+          made = { name: String(params.name), isfolder: true, folderid: nextFolderId++, parentfolderid: parent.folderid, contents: [] }
+          parent.contents!.push(made)
+        }
+        return { result: 0, created: true, metadata: { ...made, contents: undefined } }
+      }
       case 'getfilelink':
         return params.forcedownload ? downloadLink(Number(params.fileid)) : link(Number(params.fileid), false, trackSeconds)
       case 'uploadfile':
@@ -216,7 +267,8 @@ export function installFake(trackSeconds = 6, signedIn = true) {
       case 'renamefile': {
         const meta = files.get(Number(params.fileid))
         if (!meta) throw new PCloudError(2009, 'File not found.')
-        meta.name = String(params.toname)
+        if (params.toname !== undefined) meta.name = String(params.toname)
+        if (params.tofolderid !== undefined) moveInto(meta, folderOf(params, 'tofolderid'))
         return { result: 0, metadata: { ...meta } }
       }
       case 'getaudiolink':

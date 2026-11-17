@@ -1,4 +1,5 @@
-// Trascinare con il mouse: brani (o cartelle intere) sulle playlist, playlist dentro i gruppi.
+// Trascinare con il mouse: brani (o cartelle intere) sulle playlist o in un'altra cartella,
+// playlist dentro i gruppi.
 // Solo con il mouse: sul telefono la barra laterale non c'è e il tocco lungo resta allo scorrimento.
 
 import { useEffect, useState, type DragEvent } from 'react'
@@ -6,8 +7,11 @@ import type { Playlist } from '../lib/playlists'
 import { createStore, useStore } from '../lib/store'
 
 export type Dragged =
-  /** Brani (id file pCloud) da aggiungere; `label` segue il puntatore e fa da nome a una nuova playlist. */
-  | { kind: 'tracks'; ids: number[]; label: string }
+  /**
+   * Brani (id file pCloud) da aggiungere a una playlist o da spostare; `label` segue il puntatore e fa
+   * da nome a una nuova playlist. `folder` se si trascina una cartella intera (si sposta la cartella).
+   */
+  | { kind: 'tracks'; ids: number[]; label: string; folder?: number }
   /** Una playlist da spostare in un gruppo. */
   | { kind: 'playlist'; id: number; title: string; group: string | null }
 
@@ -17,8 +21,14 @@ export const dragStore = createStore<Dragged | null>(null)
 /** Mouse o trackpad (non il tocco): si può trascinare e selezionare più righe. */
 export const finePointer = typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches
 
-/** I brani si aggiungono (copia), le playlist si spostano: l'effetto del bersaglio deve combaciare, o il rilascio viene rifiutato. */
-const effectOf = (dragged: Dragged) => (dragged.kind === 'tracks' ? 'copy' : 'move')
+type Effect = 'copy' | 'move'
+
+/**
+ * I brani si aggiungono alle playlist (copia) o si spostano in una cartella, le playlist si spostano:
+ * l'effetto del bersaglio deve essere tra quelli ammessi, o il rilascio viene rifiutato.
+ */
+const allowedOf = (dragged: Dragged) => (dragged.kind === 'tracks' ? 'copyMove' : 'move')
+const effectOf = (dragged: Dragged): Effect => (dragged.kind === 'tracks' ? 'copy' : 'move')
 
 let startedAt = 0
 
@@ -31,7 +41,7 @@ if (typeof window !== 'undefined') {
 }
 
 function start(event: DragEvent<HTMLElement>, dragged: Dragged, ghostText: string) {
-  event.dataTransfer.effectAllowed = effectOf(dragged)
+  event.dataTransfer.effectAllowed = allowedOf(dragged)
   event.dataTransfer.setData('text/plain', ghostText)
   const ghost = document.createElement('div')
   ghost.className = 'drag-ghost'
@@ -44,7 +54,7 @@ function start(event: DragEvent<HTMLElement>, dragged: Dragged, ghostText: strin
 }
 
 /** Proprietà per un elemento che trascina brani. `get` viene chiamata solo quando parte il trascinamento. */
-export function dragTracks(get: () => { ids: number[]; label: string } | null) {
+export function dragTracks(get: () => { ids: number[]; label: string; folder?: number } | null) {
   if (!finePointer) return {}
   return {
     draggable: true,
@@ -95,8 +105,9 @@ export function useDropTargets() {
   /**
    * Proprietà per un bersaglio. Con `onDrop` null l'elemento non accetta il rilascio,
    * ma con `hover` reagisce comunque al passaggio (per esempio un gruppo chiuso che si apre).
+   * `effect` dice cosa succede ai brani: 'copy' su una playlist (normale), 'move' su una cartella.
    */
-  const target = (key: string, onDrop: (() => void) | null, hover?: { enter: () => void; leave: () => void }) => {
+  const target = (key: string, onDrop: (() => void) | null, hover?: { enter: () => void; leave: () => void }, effect?: Effect) => {
     if (!dragged || (!onDrop && !hover)) return {}
     return {
       'data-drop': key,
@@ -112,7 +123,7 @@ export function useDropTargets() {
         setOver(key)
         if (!onDrop) return
         event.preventDefault()
-        event.dataTransfer.dropEffect = effectOf(dragged)
+        event.dataTransfer.dropEffect = effect ?? effectOf(dragged)
       },
       onDragLeave: (event: DragEvent<HTMLElement>) => {
         const next = event.relatedTarget instanceof Element ? event.relatedTarget.closest('[data-drop]') : null

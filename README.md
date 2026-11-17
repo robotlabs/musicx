@@ -44,6 +44,12 @@ cd android && ./gradlew installDebug
   i numeri siano tutti diversi. Trascinando la maniglia ⠿ di un brano (cartelle di soli mp3) il
   nuovo ordine diventa il numero di traccia scritto nei file, 1, 2, 3…: l'indice cambia subito e i
   file si riscrivono in sottofondo, solo quelli col numero cambiato (oltre 20 file chiede prima).
+- **Sposta in cartella**: dal ⋯ di un brano, di più brani selezionati o di una cartella. Si sceglie la
+  cartella navigando quelle vere di pCloud (anche le vuote) e se ne può creare una nuova; in cima
+  c'è l'ultima usata. Sul Mac basta trascinare brani o cartelle su una cartella della lista o del
+  percorso in alto. Sposta pCloud (`renamefile`/`renamefolder` con `tofolderid`): stesso fileid,
+  quindi i brani restano nelle playlist. Un file con lo stesso nome già là non viene sostituito:
+  quel brano resta dov'è. L'indice si aggiorna subito; rclone se ne accorge da solo in pochi secondi.
 - **Playlist**: sono le playlist native di pCloud (API `collection_*`), quindi le stesse su ogni
   dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando o, dal ⋯,
   "Ordina per numero di traccia" (album nell'ordine in cui compaiono, dentro il numero), import dei

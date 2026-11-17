@@ -15,7 +15,8 @@ import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
 import { editTracksInfo } from './editInfo'
 import { Icon } from './icons'
-import { dragTracks } from './drag'
+import { dragTracks, useDropTargets } from './drag'
+import { moveFolderFlow, moveFolderInto, moveTracksTo, stepsTo } from './moveTo'
 import { Notice, TrackRow } from './parts'
 import { Grip, shiftOf, useDragReorder } from './reorder'
 import { useSelection } from './selection'
@@ -75,6 +76,24 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
   const trail = folderTrail(library, folder.id)
   const everything = (target: Folder) => queueItems(library, tracksUnder(library, target.id))
 
+  // Sul Mac brani e cartelle si trascinano su una cartella della lista o del percorso in alto: ci si spostano.
+  const { dragged, over, target: dropTarget } = useDropTargets()
+  const dropOn = (destId: number) => {
+    const key = `folder-${destId}`
+    let onDrop: (() => void) | null = null
+    if (dragged?.kind === 'tracks') {
+      const dest = stepsTo(library, destId)
+      const moving = dragged.folder
+      if (moving !== undefined) {
+        const source = library.folders.get(moving)
+        if (source && source.parent !== destId && !dest.some((step) => step.id === moving)) onDrop = () => void moveFolderInto(moving, dest)
+      } else if (dragged.ids.some((trackId) => library.tracks.get(trackId)?.parent !== destId)) {
+        onDrop = () => void moveTracksTo(dragged.ids, dest)
+      }
+    }
+    return { props: dropTarget(key, onDrop, undefined, 'move'), over: onDrop !== null && over === key }
+  }
+
   const openFolderMenu = (target: Folder) =>
     openMenu(
       target.name,
@@ -84,7 +103,10 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
         ...queueMenuItems(everything(target)),
         ...(target.id === library.rootId
           ? []
-          : [{ label: 'Modifica info dei brani', icon: 'edit' as const, onSelect: () => editTracksInfo(tracksUnder(library, target.id)) }]),
+          : [
+              { label: 'Sposta in cartella…', icon: 'moveTo' as const, onSelect: () => void moveFolderFlow(target.id) },
+              { label: 'Modifica info dei brani', icon: 'edit' as const, onSelect: () => editTracksInfo(tracksUnder(library, target.id)) },
+            ]),
       ],
       tracksLabel(target.total),
     )
@@ -93,12 +115,17 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
     <>
       {!isRoot && (
         <nav className="crumbs" aria-label="Percorso">
-          {trail.slice(0, -1).map((step, i) => (
-            <span key={step.id}>
-              <a href={routeHref({ name: 'folder', id: i === 0 ? null : step.id })}>{i === 0 ? 'Libreria' : step.name}</a>
-              <Icon name="chevron" size={14} />
-            </span>
-          ))}
+          {trail.slice(0, -1).map((step, i) => {
+            const drop = dropOn(step.id)
+            return (
+              <span key={step.id}>
+                <a href={routeHref({ name: 'folder', id: i === 0 ? null : step.id })} className={drop.over ? 'drop-over' : undefined} {...drop.props}>
+                  {i === 0 ? 'Libreria' : step.name}
+                </a>
+                <Icon name="chevron" size={14} />
+              </span>
+            )
+          })}
         </nav>
       )}
       <header className="view-head">
@@ -125,11 +152,13 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
       <ul className={`rows${drag ? ' reordering' : ''}`}>
         {folder.folders.map((childId) => {
           const child = library.folders.get(childId)!
+          const drop = dropOn(childId)
           return (
             <li
-              className="row"
+              className={`row${drop.over ? ' drop-over' : ''}`}
               key={`folder-${childId}`}
-              {...dragTracks(() => ({ ids: tracksUnder(library, childId), label: child.name }))}
+              {...dragTracks(() => ({ ids: tracksUnder(library, childId), label: child.name, folder: childId }))}
+              {...drop.props}
             >
               <a className="row-main" href={routeHref({ name: 'folder', id: childId })}>
                 <span className="row-icon folder">

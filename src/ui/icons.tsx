@@ -46,6 +46,14 @@ const paths = {
       <line x1="9" y1="14" x2="15" y2="14" />
     </>
   ),
+  // Cartella con una freccia dentro: "sposta in".
+  moveTo: (
+    <>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      <polyline points="12 10 15 13 12 16" />
+      <line x1="8" y1="13" x2="15" y2="13" />
+    </>
+  ),
   music: (
     <>
       <path d="M9 18V5l12-2v13" />
@@ -98,6 +106,7 @@ const paths = {
   ),
   chevron: <polyline points="9 18 15 12 9 6" />,
   down: <polyline points="6 9 12 15 18 9" />,
+  up: <polyline points="18 15 12 9 6 15" />,
   grip: (
     <>
       <line x1="4" y1="9" x2="20" y2="9" />

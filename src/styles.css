@@ -1172,6 +1172,51 @@ button.danger:not(.primary) {
   gap: 8px;
 }
 
+/* Sposta in cartella */
+
+.menu-note {
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--dim);
+}
+
+.menu-note.danger {
+  color: var(--danger);
+}
+
+.new-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 6px 4px 14px;
+}
+
+.menu .new-folder button {
+  flex: none;
+  width: auto;
+  min-height: 0;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 20px;
+}
+
+.new-folder input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.crumbs a.drop-over {
+  border-radius: 6px;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
 /* Modifica info */
 
 .info-form {

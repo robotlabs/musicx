@@ -161,6 +161,30 @@ export async function renameFile(fileid: number, toname: string): Promise<RawMet
   return (await call<{ metadata: RawMeta }>('renamefile', { fileid, toname })).metadata
 }
 
+/** Il contenuto di una cartella (senza entrare nelle sottocartelle); con `foldersOnly` niente file. */
+export async function listFolder(folderid: number, foldersOnly = false): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('listfolder', { folderid, nofiles: foldersOnly ? 1 : undefined, noshares: 1 })).metadata
+}
+
+/**
+ * Sposta un file in un'altra cartella. È sempre lo stesso file (stesso fileid), quindi resta nelle
+ * playlist. Attenzione: se là c'è già un file con quel nome pCloud lo sostituisce, quindi chi
+ * chiama deve controllare prima.
+ */
+export async function moveFile(fileid: number, tofolderid: number): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('renamefile', { fileid, tofolderid })).metadata
+}
+
+/** Sposta una cartella con tutto quello che contiene (se là ce n'è già una con quel nome pCloud dice di no). */
+export async function moveFolder(folderid: number, tofolderid: number): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('renamefolder', { folderid, tofolderid })).metadata
+}
+
+/** Crea una cartella; se ce n'è già una con quel nome restituisce quella. */
+export async function createFolder(folderid: number, name: string): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('createfolderifnotexists', { folderid, name })).metadata
+}
+
 export async function accountEmail(): Promise<string> {
   return (await call<{ email: string }>('userinfo')).email
 }

@@ -6,6 +6,7 @@ import { addToPlaylist, playlistsStore } from '../lib/playlists'
 import type { QItem } from '../lib/queue'
 import { navigate } from '../lib/router'
 import { editTracksInfo } from './editInfo'
+import { moveTracksFlow } from './moveTo'
 import { choosePlaylist, openMenu, toast, type MenuItem } from './sheets'
 import { errorText, tracksLabel } from './text'
 
@@ -38,11 +39,14 @@ export function queueMenuItems(items: QItem[]): MenuItem[] {
   ]
 }
 
-/** "Modifica info" se i brani sono nella libreria (una playlist può contenere file di altre cartelle). */
+/** "Sposta in cartella…" e "Modifica info" se i brani sono nella libreria (una playlist può contenere file di altre cartelle). */
 const editItem = (ids: number[]): MenuItem[] => {
   const library = libraryStore.get().library
   if (!ids.length || !ids.every((id) => library?.tracks.has(id))) return []
-  return [{ label: ids.length > 1 ? `Modifica info di ${tracksLabel(ids.length)}` : 'Modifica info', icon: 'edit', onSelect: () => editTracksInfo(ids) }]
+  return [
+    { label: 'Sposta in cartella…', icon: 'moveTo', onSelect: () => void moveTracksFlow(ids) },
+    { label: ids.length > 1 ? `Modifica info di ${tracksLabel(ids.length)}` : 'Modifica info', icon: 'edit', onSelect: () => editTracksInfo(ids) },
+  ]
 }
 
 /**

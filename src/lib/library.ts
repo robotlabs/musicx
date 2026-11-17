@@ -313,19 +313,20 @@ const describe = (error: unknown) => {
 let refreshInFlight: Promise<void> | null = null
 
 /**
- * Le modifiche ai brani fatte mentre si rilegge la libreria. L'elenco di pCloud può essere stato
- * letto prima: senza rimetterle, l'indice nuovo le cancellerebbe (e verrebbe pure salvato così).
+ * Le modifiche fatte mentre si rilegge la libreria. L'elenco di pCloud può essere stato letto
+ * prima: senza rimetterle, l'indice nuovo le cancellerebbe (e verrebbe pure salvato così).
  */
-let changedDuringRefresh: Map<number, TrackChange> | null = null
+let changedDuringRefresh: Edits | null = null
 
 /** Rilegge tutta la libreria da pCloud. */
 export function refreshLibrary(): Promise<void> {
   refreshInFlight ??= (async () => {
     const hadLibrary = libraryStore.get().library !== null
     libraryStore.set((state) => ({ ...state, status: hadLibrary ? 'ready' : 'loading', refreshing: hadLibrary, error: null }))
-    changedDuringRefresh = new Map()
+    const during: Edits = { tracks: new Map(), folders: new Map() }
+    changedDuringRefresh = during
     try {
-      const library = withChanges(buildLibrary(await listTree(MUSIC_ROOT)), changedDuringRefresh)
+      const library = withChanges(buildLibrary(await listTree(MUSIC_ROOT)), during)
       libraryStore.set({ status: 'ready', library, error: null, refreshing: false })
       await writeCache(library)
     } catch (error) {
@@ -353,39 +354,118 @@ export async function initLibrary() {
   if (Date.now() - cached.builtAt > LIBRARY_MAX_AGE_MS) void refreshLibrary()
 }
 
-type TrackChange = Partial<Omit<Track, 'id' | 'parent'>>
+/** Cosa cambia in un brano. Con `parent` il brano passa in un'altra cartella. */
+export type TrackChange = Partial<Omit<Track, 'id'>>
 
-/** La libreria con i brani cambiati e le loro cartelle riordinate (nome, album o numero spostano un brano). */
-function withChanges(library: Library, changes: Map<number, TrackChange>): Library {
-  if (!changes.size) return library
+/** Dove sta una cartella: se non è nell'indice (vuota o appena creata) la si aggiunge, se sta altrove la si sposta. */
+export interface FolderPlace {
+  parent: number
+  name: string
+}
+
+interface Edits {
+  tracks: Map<number, TrackChange>
+  folders: Map<number, FolderPlace>
+}
+
+/**
+ * La libreria con le modifiche: prima le cartelle (create o spostate), poi i brani. Le cartelle
+ * toccate si riordinano (nome, album o numero spostano un brano) e i conteggi si aggiornano.
+ * L'indice di partenza resta com'era: le cartelle cambiate sono copie.
+ */
+function withChanges(library: Library, { tracks: changes, folders: places }: Edits): Library {
+  if (!changes.size && !places.size) return library
   const tracks = new Map(library.tracks)
   const folders = new Map(library.folders)
+  const copied = new Set<number>()
+  const own = (id: number): Folder | undefined => {
+    const folder = folders.get(id)
+    if (!folder || copied.has(id)) return folder
+    const copy = { ...folder, folders: [...folder.folders], tracks: [...folder.tracks] }
+    folders.set(id, copy)
+    copied.add(id)
+    return copy
+  }
+  const addToTotals = (from: number, amount: number) => {
+    for (let folder = own(from), steps = 0; folder && steps < 200; folder = own(folder.parent), steps++) folder.total += amount
+  }
+  /** `id` è `ancestor` o sta dentro (una cartella non può finire dentro sé stessa). */
+  const isWithin = (id: number, ancestor: number) => {
+    for (let at = folders.get(id), steps = 0; at && steps < 200; at = folders.get(at.parent), steps++) {
+      if (at.id === ancestor) return true
+    }
+    return false
+  }
+  const sortChildren = (folder: Folder) => folder.folders.sort((a, b) => collator.compare(folders.get(a)!.name, folders.get(b)!.name))
+
+  const place = (id: number, wanted: FolderPlace, depth = 0): boolean => {
+    if (depth > 200) return false
+    const above = places.get(wanted.parent)
+    const parentKnown = folders.has(wanted.parent) || (above !== undefined && place(wanted.parent, above, depth + 1))
+    if (!parentKnown || isWithin(wanted.parent, id)) return false
+    const current = folders.get(id)
+    if (current && current.parent === wanted.parent && current.name === wanted.name) return true
+    if (!current) {
+      folders.set(id, { id, parent: wanted.parent, name: wanted.name, folders: [], tracks: [], total: 0 })
+      copied.add(id)
+      const parent = own(wanted.parent)!
+      parent.folders.push(id)
+      sortChildren(parent)
+      return true
+    }
+    const folder = own(id)!
+    if (folder.parent !== wanted.parent) {
+      const old = own(folder.parent)
+      if (old) old.folders = old.folders.filter((child) => child !== id)
+      addToTotals(folder.parent, -folder.total)
+      folder.parent = wanted.parent
+      own(wanted.parent)!.folders.push(id)
+      addToTotals(wanted.parent, folder.total)
+    }
+    folder.name = wanted.name
+    sortChildren(own(wanted.parent)!)
+    return true
+  }
+  for (const [id, wanted] of places) place(id, wanted)
+
   const touched = new Set<number>()
   for (const [id, change] of changes) {
     const track = tracks.get(id)
     if (!track) continue
-    tracks.set(id, { ...track, ...change })
-    touched.add(track.parent)
+    const next = { ...track, ...change }
+    // Una cartella che l'indice non conosce: il brano resta dov'era fino alla prossima lettura.
+    if (next.parent === undefined || !folders.has(next.parent)) next.parent = track.parent
+    if (next.parent !== track.parent) {
+      const old = own(track.parent)
+      if (old) old.tracks = old.tracks.filter((other) => other !== id)
+      addToTotals(track.parent, -1)
+      own(next.parent)!.tracks.push(id)
+      addToTotals(next.parent, 1)
+    }
+    tracks.set(id, next)
+    touched.add(next.parent)
   }
   for (const id of touched) {
-    const folder = folders.get(id)
-    if (folder) folders.set(id, { ...folder, tracks: sortFolderTracks(folder.tracks, tracks) })
+    const folder = own(id)
+    if (folder) folder.tracks = sortFolderTracks(folder.tracks, tracks)
   }
   return { ...library, tracks, folders }
 }
 
 /**
- * Aggiorna dei brani nell'indice (dopo averne cambiato tag o nome) senza rileggere tutta la libreria.
+ * Aggiorna dei brani nell'indice (dopo averne cambiato tag, nome o cartella) senza rileggere tutta
+ * la libreria; `folders` mette a posto prima le cartelle (una nuova, una spostata).
  * La libreria diventa un oggetto nuovo, così liste e ricerca si ricalcolano.
  */
-export function updateTracks(changes: Map<number, TrackChange>) {
+export function updateTracks(changes: Map<number, TrackChange>, folders: Map<number, FolderPlace> = new Map()) {
   const library = libraryStore.get().library
-  if (!library || !changes.size) return
+  if (!library || (!changes.size && !folders.size)) return
   if (changedDuringRefresh) {
-    for (const [id, change] of changes) changedDuringRefresh.set(id, { ...changedDuringRefresh.get(id), ...change })
+    for (const [id, change] of changes) changedDuringRefresh.tracks.set(id, { ...changedDuringRefresh.tracks.get(id), ...change })
+    for (const [id, place] of folders) changedDuringRefresh.folders.set(id, place)
   }
-  rememberEdits(changes)
-  const next = withChanges(library, changes)
+  rememberEdits(changes, folders)
+  const next = withChanges(library, { tracks: changes, folders })
   libraryStore.set((state) => ({ ...state, library: next }))
   // Con tante modifiche di fila l'indice (decine di migliaia di brani) si salva una volta sola alla fine.
   clearTimeout(saveTimer)
@@ -405,30 +485,39 @@ function saveNow() {
 // salvataggio non farebbe in tempo: le modifiche si annotano anche qui, subito, e all'avvio si
 // rimettono sopra l'indice salvato. Si cancellano quando l'indice salvato le contiene.
 const editsKey = () => storageKey('library-edits')
+const placesKey = () => storageKey('library-folders')
 
-function readEdits(): Map<number, TrackChange> {
+function readEdits(): Edits {
+  const edits: Edits = { tracks: new Map(), folders: new Map() }
   try {
-    const saved = JSON.parse(localStorage.getItem(editsKey()) ?? '{}') as Record<string, Record<string, string | null>>
-    return new Map(
-      Object.entries(saved).map(([id, change]) => [
-        Number(id),
-        Object.fromEntries(Object.entries(change).map(([key, value]) => [key, value ?? undefined])) as TrackChange,
-      ]),
-    )
+    const saved = JSON.parse(localStorage.getItem(editsKey()) ?? '{}') as Record<string, Record<string, string | number | null>>
+    for (const [id, change] of Object.entries(saved)) {
+      edits.tracks.set(Number(id), Object.fromEntries(Object.entries(change).map(([key, value]) => [key, value ?? undefined])) as TrackChange)
+    }
+    const places = JSON.parse(localStorage.getItem(placesKey()) ?? '{}') as Record<string, FolderPlace>
+    for (const [id, place] of Object.entries(places)) edits.folders.set(Number(id), place)
   } catch {
-    return new Map()
+    // Annotazioni illeggibili: vale l'indice salvato.
   }
+  return edits
 }
 
-function rememberEdits(changes: Map<number, TrackChange>) {
+function rememberEdits(changes: Map<number, TrackChange>, folders: Map<number, FolderPlace>) {
   try {
-    const saved = JSON.parse(localStorage.getItem(editsKey()) ?? '{}') as Record<string, Record<string, unknown>>
-    for (const [id, change] of changes) {
-      // null al posto di undefined, che in JSON sparirebbe (un campo tolto deve restare tolto).
-      const plain = Object.fromEntries(Object.entries(change).map(([key, value]) => [key, value ?? null]))
-      saved[id] = { ...saved[id], ...plain }
+    if (changes.size) {
+      const saved = JSON.parse(localStorage.getItem(editsKey()) ?? '{}') as Record<string, Record<string, unknown>>
+      for (const [id, change] of changes) {
+        // null al posto di undefined, che in JSON sparirebbe (un campo tolto deve restare tolto).
+        const plain = Object.fromEntries(Object.entries(change).map(([key, value]) => [key, value ?? null]))
+        saved[id] = { ...saved[id], ...plain }
+      }
+      localStorage.setItem(editsKey(), JSON.stringify(saved))
     }
-    localStorage.setItem(editsKey(), JSON.stringify(saved))
+    if (folders.size) {
+      const saved = JSON.parse(localStorage.getItem(placesKey()) ?? '{}') as Record<string, FolderPlace>
+      for (const [id, place] of folders) saved[id] = place
+      localStorage.setItem(placesKey(), JSON.stringify(saved))
+    }
   } catch {
     // Senza localStorage resta il salvataggio dell'indice.
   }
@@ -437,7 +526,7 @@ function rememberEdits(changes: Map<number, TrackChange>) {
 /** Le modifiche annotate finora, da cancellare quando l'indice che le contiene è salvato. */
 function editsSnapshot(): string | null {
   try {
-    return localStorage.getItem(editsKey())
+    return JSON.stringify([localStorage.getItem(editsKey()), localStorage.getItem(placesKey())])
   } catch {
     return null
   }
@@ -446,7 +535,10 @@ function editsSnapshot(): string | null {
 function forgetEdits(snapshot: string | null) {
   try {
     // Se nel frattempo ne sono arrivate altre, restano: l'indice salvato non le contiene ancora.
-    if (snapshot !== null && localStorage.getItem(editsKey()) === snapshot) localStorage.removeItem(editsKey())
+    if (snapshot !== null && editsSnapshot() === snapshot) {
+      localStorage.removeItem(editsKey())
+      localStorage.removeItem(placesKey())
+    }
   } catch {
     // Niente da fare.
   }
