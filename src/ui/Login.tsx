@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { authStore, loginConfigured, startLogin } from '../lib/auth'
+import { isNativeApp } from '../lib/native'
 import { completeLogin, passwordLogin, type Challenge, type LoginStep } from '../lib/passwordLogin'
 import { useStore } from '../lib/store'
 
@@ -107,8 +108,9 @@ function PasswordLogin({ autoFocus }: { autoFocus: boolean }) {
 
 export function Login() {
   const { notice } = useStore(authStore)
-  const oauth = loginConfigured()
   // Con l'app pCloud approvata l'accesso principale è quello OAuth; email e password restano di riserva.
+  // Non nell'app Android: la pagina di pCloud si aprirebbe in Chrome e il token finirebbe lì.
+  const oauth = loginConfigured() && !isNativeApp
   const [withPassword, setWithPassword] = useState(!oauth)
 
   return (

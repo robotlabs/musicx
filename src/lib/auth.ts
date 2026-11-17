@@ -1,4 +1,4 @@
-import { PCLOUD_CLIENT_ID } from '../config'
+import { PCLOUD_CLIENT_ID, PCLOUD_REDIRECT_URI } from '../config'
 import { createStore } from './store'
 
 export interface Auth {
@@ -45,7 +45,7 @@ export function saveAuth(auth: Auth) {
 /** L'indirizzo a cui pCloud rimanda dopo l'accesso: va registrato identico nell'app pCloud. */
 export const redirectUri = () => location.origin + location.pathname.replace(/index\.html$/, '')
 
-export const loginConfigured = () => PCLOUD_CLIENT_ID !== ''
+export const loginConfigured = () => PCLOUD_CLIENT_ID !== '' && redirectUri() === PCLOUD_REDIRECT_URI
 
 function randomState(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16))

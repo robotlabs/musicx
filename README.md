@@ -103,17 +103,20 @@ Due modi, una volta per dispositivo:
   sessione. Se pCloud chiede un codice (2FA o conferma di un dispositivo nuovo via email) l'app lo
   chiede a sua volta; questi passi non sono documentati da pCloud e seguono
   [go-pcloud](https://github.com/StarHack/go-pcloud). Funziona senza nessuna app registrata.
-- **OAuth** ("Accedi con pCloud"): compare quando `PCLOUD_CLIENT_ID` è impostato. Diventa il pulsante
-  principale e email e password restano come riserva.
+- **OAuth** ("Accedi con pCloud"): l'app pCloud è approvata e il suo Client ID è in `src/config.ts`.
+  È il pulsante principale e email e password restano come riserva. Compare solo sul sito
+  pubblicato: pCloud accetta un solo Redirect URI, `https://robotlabs.github.io/musicx/`, identico
+  (in sviluppo su `localhost` resta email e password). Nell'app Android non compare: la pagina di
+  pCloud si aprirebbe in Chrome e il token finirebbe lì invece che nell'app.
 
-Configurare OAuth (una volta sola):
+Com'è configurato OAuth (già fatto, app "robotlabs-music"):
 
-1. Su <https://docs.pcloud.com/my_apps/> crea un'app con accesso a **tutto** il drive (non solo
-   alla cartella dell'app). pCloud deve approvarla.
-2. Redirect URI da registrare: `https://robotlabs.github.io/musicx/` e, per lo sviluppo,
-   `http://localhost:5173/`.
-3. Scrivi il Client ID in `src/config.ts` (`PCLOUD_CLIENT_ID`). È pubblico per costruzione: il
-   flusso OAuth "token" non usa segreti.
+1. Su <https://docs.pcloud.com/my_apps/> un'app con accesso a **tutto** il drive (non solo alla
+   cartella dell'app), approvata da pCloud.
+2. Redirect URI: `https://robotlabs.github.io/musicx/` (se ne può registrare uno solo).
+3. Client ID e Redirect URI in `src/config.ts` (`PCLOUD_CLIENT_ID`, `PCLOUD_REDIRECT_URI`). Il
+   Client ID è pubblico per costruzione: il flusso OAuth "token" non usa segreti, e il Client
+   secret non serve.
 
 Il token resta solo nel browser del dispositivo (localStorage). "Esci da pCloud" nel menu ⋯ lo
 cancella e, per quello di sessione, lo invalida anche su pCloud.

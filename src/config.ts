@@ -5,7 +5,10 @@ export const MUSIC_ROOT = '/rob/music'
  * Client ID dell'app registrata su https://docs.pcloud.com/my_apps/ .
  * È un valore pubblico (flusso OAuth "token"), può stare nel repo.
  */
-export const PCLOUD_CLIENT_ID = ''
+export const PCLOUD_CLIENT_ID: string = 'jDr9tOaTl7L'
+
+/** L'unico Redirect URI che pCloud accetta per quell'app (lo vuole identico): altrove niente OAuth. */
+export const PCLOUD_REDIRECT_URI = 'https://robotlabs.github.io/musicx/'
 
 /**
  * Dove risponde rclone sul Mac (`rclone serve http pcloud:rob/music`, servizio launchd
