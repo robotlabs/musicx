@@ -34,7 +34,7 @@ async function check() {
 
 /** "Aggiorna" del banner. */
 export function applyUpdate() {
-  if (bundledApp) void applyAppUpdate()
+  if (bundledApp) void applyAppUpdate(runningBundle())
   else location.reload()
 }
 
