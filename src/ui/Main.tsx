@@ -1,12 +1,15 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { MUSIC_ROOT } from '../config'
+import { initAudioStore } from '../lib/audioStore'
 import { clearAuth } from '../lib/auth'
+import { forgetSavedMusic } from '../lib/cleanup'
+import { initDownloads } from '../lib/downloads'
 import { clearLibrary, initLibrary, libraryStore, refreshLibrary } from '../lib/library'
 import { isOpen, loadOpenGroups, openGroupsStore, setGroupOpen, toggleGroup } from '../lib/openGroups'
 import { ANDROID_APP_URL, isAndroidBrowser } from '../lib/native'
 import { accountEmail, endSession } from '../lib/pcloud'
 import { initPlayer, playerStore, resetPlayer, toggle } from '../lib/player'
-import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, type Playlist } from '../lib/playlists'
+import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, restorePlaylists, type Playlist } from '../lib/playlists'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
 import { useStore } from '../lib/store'
 import { FolderView } from './FolderView'
@@ -16,6 +19,8 @@ import { PlaylistsView } from './PlaylistsView'
 import { PlaylistView } from './PlaylistView'
 import { QueueView } from './QueueView'
 import { SearchView } from './SearchView'
+import { StorageView } from './StorageView'
+import { offersDownloads } from './downloadActions'
 import { addTracksTo } from './actions'
 import { dragPlaylist, useDropTargets } from './drag'
 import { DropZones } from './DropZones'
@@ -29,6 +34,7 @@ async function logout() {
   if (!sure) return
   resetPlayer()
   resetPlaylists()
+  await forgetSavedMusic()
   await clearLibrary()
   await endSession()
   clearAuth()
@@ -52,6 +58,9 @@ function openAppMenu() {
     'musicx',
     [
       { label: 'Aggiorna la libreria da pCloud', icon: 'refresh', onSelect: () => void refresh() },
+      ...(offersDownloads()
+        ? [{ label: 'Download e spazio', icon: 'storage' as const, onSelect: () => navigate({ name: 'storage' }) }]
+        : []),
       // In Chrome sul telefono i brani non suonano: l'app sì.
       ...(isAndroidBrowser
         ? [{ label: "Scarica l'app per Android", icon: 'upload' as const, onSelect: () => location.assign(ANDROID_APP_URL) }]
@@ -292,8 +301,10 @@ export function Main() {
   useEffect(() => {
     loadOpenGroups()
     initPlayer()
+    restorePlaylists()
     void initLibrary()
     void refreshPlaylists()
+    void initAudioStore().then(initDownloads)
     accountEmail().then(
       (email) => (account = email),
       () => {},
@@ -332,6 +343,7 @@ export function Main() {
         {route.name === 'playlists' && <PlaylistsView />}
         {route.name === 'playlist' && <PlaylistView id={route.id} key={route.id} />}
         {route.name === 'queue' && <QueueView />}
+        {route.name === 'storage' && <StorageView />}
       </main>
       <PlayerBar />
       <Tabs route={route} />

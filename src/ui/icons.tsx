@@ -158,6 +158,29 @@ const paths = {
       <path d="M4 4v7a4 4 0 0 0 4 4h12" />
     </>
   ),
+  // Freccia in giù dentro un cerchio, come il pulsante di download di Spotify.
+  download: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="8 12 12 16 16 12" />
+      <line x1="12" y1="7" x2="12" y2="16" />
+    </>
+  ),
+  // Cerchio pieno con la freccia scavata: brano o playlist già sul dispositivo.
+  downloaded: (
+    <>
+      <circle cx="12" cy="12" r="11" fill="currentColor" stroke="none" />
+      <polyline points="8 12 12 16 16 12" stroke="var(--bg, #fff)" />
+      <line x1="12" y1="6.5" x2="12" y2="15.5" stroke="var(--bg, #fff)" />
+    </>
+  ),
+  storage: (
+    <>
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof paths

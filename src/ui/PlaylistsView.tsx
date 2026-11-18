@@ -1,4 +1,5 @@
 import { useMemo, useRef, type ChangeEvent } from 'react'
+import { downloadsStore } from '../lib/downloads'
 import { libraryStore } from '../lib/library'
 import { matchM3u, parseM3u } from '../lib/m3u'
 import { isOpen, openGroupsStore, toggleGroup } from '../lib/openGroups'
@@ -12,6 +13,7 @@ import {
 } from '../lib/playlists'
 import { navigate, routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
+import { SavedMark } from './downloadActions'
 import { Icon } from './icons'
 import { Notice } from './parts'
 import { dragPlaylist, useDropTargets } from './drag'
@@ -55,6 +57,7 @@ function groupTarget(targets: Targets, group: string) {
 
 function PlaylistRow({ list, targets }: { list: Playlist; targets: Targets }) {
   const drop = list.group ? groupTarget(targets, list.group) : { props: {}, over: false }
+  const pinned = useStore(downloadsStore, (state) => state.pins.playlists.includes(list.id))
   return (
     <li
       className={`row${list.group ? ' nested' : ''}`}
@@ -71,7 +74,10 @@ function PlaylistRow({ list, targets }: { list: Playlist; targets: Targets }) {
         </span>
         <span className="row-text">
           <span className="row-title">{list.title}</span>
-          <span className="row-sub">{tracksLabel(list.count)}</span>
+          <span className="row-sub">
+            {pinned && <SavedMark />}
+            {tracksLabel(list.count)}
+          </span>
         </span>
       </a>
       <button className="icon-button" aria-label={`Azioni per ${list.title}`} onClick={() => openPlaylistMenu(list)}>

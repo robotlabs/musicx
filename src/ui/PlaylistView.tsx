@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react'
 import { playerStore, playItems, playShuffled } from '../lib/player'
 import { setGroupOpen } from '../lib/openGroups'
 import {
@@ -12,6 +12,7 @@ import {
 import { navigate } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
+import { DownloadToggle, playlistDownloadItems, useDownloadedCount } from './downloadActions'
 import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
 import { Grip, shiftOf, useDragReorder } from './reorder'
@@ -69,7 +70,8 @@ export function PlaylistView({ id }: { id: number }) {
 
   useEffect(() => {
     setError(null)
-    loadPlaylist(id).catch((problem) => setError(errorText(problem)))
+    // Senza rete va bene la copia salvata sul dispositivo, se c'è.
+    loadPlaylist(id).catch((problem) => !playlistsStore.get().tracks[id] && setError(errorText(problem)))
   }, [id])
 
   // Le righe sono memoizzate: ricevono funzioni stabili che leggono i brani più recenti da qui.
@@ -83,6 +85,8 @@ export function PlaylistView({ id }: { id: number }) {
     [id],
   )
   const { drag, start, move, end } = useDragReorder(tracks?.length ?? 0, reorder)
+  const trackIds = useMemo(() => (tracks ?? noTracks).map((track) => track.id), [tracks])
+  const downloaded = useDownloadedCount(trackIds)
   const selection = useSelection(tracks ?? noTracks, list?.title ?? 'Playlist')
   const { selectedWith } = selection
 
@@ -121,6 +125,7 @@ export function PlaylistView({ id }: { id: number }) {
       name,
       [
         ...(tracks.length ? queueMenuItems(tracks).slice(0, 2) : []),
+        ...(tracks.length ? playlistDownloadItems(id, tracks.length) : []),
         ...(tracks.length > 1
           ? [
               {
@@ -153,7 +158,10 @@ export function PlaylistView({ id }: { id: number }) {
       </nav>
       <header className="view-head">
         <h1>{name}</h1>
-        <p className="dim">{tracksLabel(tracks.length)}</p>
+        <p className="dim">
+          {tracksLabel(tracks.length)}
+          {downloaded > 0 && ` · ${downloaded === tracks.length ? 'tutti scaricati' : `${downloaded} scaricati`}`}
+        </p>
         <div className="head-actions">
           {tracks.length > 0 && (
             <>
@@ -163,6 +171,7 @@ export function PlaylistView({ id }: { id: number }) {
               <button className="pill" onClick={() => playShuffled(tracks)}>
                 <Icon name="shuffle" size={16} /> Casuale
               </button>
+              <DownloadToggle kind="playlist" id={id} count={tracks.length} />
             </>
           )}
           <button className="icon-button" aria-label="Altre azioni" onClick={openPlaylistMenu}>

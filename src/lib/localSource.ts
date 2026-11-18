@@ -19,6 +19,9 @@ export function setLocalSourceEnabled(next: boolean) {
   status = null
 }
 
+/** true sul Mac (dove rclone può esserci), finché la modalità finta non lo spegne. */
+export const localSourceEnabled = () => enabled
+
 /** Il percorso del brano dentro la cartella della musica, già pronto per un URL. */
 export function trackPath(library: Library, trackId: number): string | null {
   const track = library.tracks.get(trackId)

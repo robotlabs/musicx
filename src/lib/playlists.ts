@@ -6,6 +6,7 @@
 // una web app (gettextfile è riservato a pcloud.com); così invece i gruppi sono gli stessi su ogni
 // dispositivo e si vedono anche nell'app di pCloud.
 
+import { storageKey } from './env'
 import { libraryStore, stripExtension, trackNumber } from './library'
 import { collections, type RawCollection, type RawMeta } from './pcloud'
 import type { QItem } from './queue'
@@ -102,8 +103,42 @@ export async function refreshPlaylists() {
     const lists = byTitle(raw.filter((collection) => !collection.system).map(toPlaylist))
     playlistsStore.set((state) => ({ ...state, lists, loaded: true, error: null }))
   } catch (error) {
-    playlistsStore.set((state) => ({ ...state, loaded: true, error: message(error) }))
+    // Senza rete restano quelle salvate sul dispositivo.
+    playlistsStore.set((state) => ({ ...state, loaded: true, error: state.lists.length ? null : message(error) }))
   }
+}
+
+// Copia sul dispositivo di playlist e brani delle playlist aperte: servono senza rete.
+const cacheKey = () => storageKey('playlists')
+let persisting = false
+
+function savePlaylists() {
+  const { lists, tracks, loaded } = playlistsStore.get()
+  if (!loaded) return
+  try {
+    localStorage.setItem(cacheKey(), JSON.stringify({ lists, tracks }))
+  } catch {
+    // Spazio esaurito: senza rete si vedranno meno playlist.
+  }
+}
+
+/** All'avvio: mostra subito le playlist salvate, poi refreshPlaylists le rilegge da pCloud. */
+export function restorePlaylists() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(cacheKey()) ?? 'null') as Pick<PlaylistsState, 'lists' | 'tracks'> | null
+    if (saved && Array.isArray(saved.lists)) {
+      playlistsStore.set((state) => (state.loaded ? state : { ...state, lists: saved.lists, tracks: saved.tracks ?? {}, loaded: true }))
+    }
+  } catch {
+    // Copia illeggibile: si aspetta pCloud.
+  }
+  if (persisting) return
+  persisting = true
+  let timer = 0
+  playlistsStore.subscribe(() => {
+    clearTimeout(timer)
+    timer = window.setTimeout(savePlaylists, 500)
+  })
 }
 
 /** Rilegge i brani di una playlist da pCloud (che resta la fonte di verità). */
@@ -316,4 +351,5 @@ export async function sortPlaylistByTrackNumber(id: number) {
 
 export function resetPlaylists() {
   playlistsStore.set({ lists: [], loaded: false, error: null, tracks: {} })
+  localStorage.removeItem(cacheKey())
 }

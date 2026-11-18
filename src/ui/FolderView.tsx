@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { downloadsStore } from '../lib/downloads'
 import { canReorder, moveFolderTrack, orderStore } from '../lib/folderOrder'
 import {
   folderTrail,
@@ -13,6 +14,7 @@ import { playerStore, playItems, playShuffled } from '../lib/player'
 import { navigate, routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
+import { DownloadToggle, folderDownloadItems, SavedMark, useDownloadedCount } from './downloadActions'
 import { editTracksInfo } from './editInfo'
 import { Icon } from './icons'
 import { dragTracks, useDropTargets } from './drag'
@@ -75,6 +77,9 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
 
   const trail = folderTrail(library, folder.id)
   const everything = (target: Folder) => queueItems(library, tracksUnder(library, target.id))
+  const allIds = useMemo(() => tracksUnder(library, folder.id), [library, folder])
+  const downloaded = useDownloadedCount(allIds)
+  const pinnedFolders = useStore(downloadsStore, (state) => state.pins.folders)
 
   // Sul Mac brani e cartelle si trascinano su una cartella della lista o del percorso in alto: ci si spostano.
   const { dragged, over, target: dropTarget } = useDropTargets()
@@ -104,6 +109,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
         ...(target.id === library.rootId
           ? []
           : [
+              ...folderDownloadItems(target.id, target.total),
               { label: 'Sposta in cartella…', icon: 'moveTo' as const, onSelect: () => void moveFolderFlow(target.id) },
               { label: 'Modifica info dei brani', icon: 'edit' as const, onSelect: () => editTracksInfo(tracksUnder(library, target.id)) },
             ]),
@@ -132,6 +138,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
         <h1>{isRoot ? 'Libreria' : folder.name}</h1>
         <p className="dim">
           {tracksLabel(folder.total)}
+          {downloaded > 0 && ` · ${downloaded === folder.total ? 'tutti scaricati' : `${downloaded} scaricati`}`}
           {saving && ` · Salvo l'ordine nei file: ${Math.min(saving.done + 1, saving.total)} di ${saving.total}…`}
         </p>
         {folder.total > 0 && (
@@ -142,6 +149,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
             <button className="pill" onClick={() => playShuffled(everything(folder))}>
               <Icon name="shuffle" size={16} /> Casuale
             </button>
+            {!isRoot && <DownloadToggle kind="folder" id={folder.id} count={folder.total} />}
             <button className="icon-button" aria-label="Altre azioni" onClick={() => openFolderMenu(folder)}>
               <Icon name="more" />
             </button>
@@ -166,7 +174,10 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
                 </span>
                 <span className="row-text">
                   <span className="row-title">{child.name}</span>
-                  <span className="row-sub">{tracksLabel(child.total)}</span>
+                  <span className="row-sub">
+                    {pinnedFolders.includes(childId) && <SavedMark />}
+                    {tracksLabel(child.total)}
+                  </span>
                 </span>
               </a>
               <button className="icon-button" aria-label={`Azioni per ${child.name}`} onClick={() => openFolderMenu(child)}>

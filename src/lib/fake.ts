@@ -1,6 +1,7 @@
 // pCloud finto, solo per lo sviluppo: apri l'app con ?fake e hai una libreria inventata,
 // brani sintetici di pochi secondi e playlist in memoria. Non finisce nella build di produzione.
 
+import { setDirectLinks } from './audioStore'
 import { setMemoryAuth } from './auth'
 import { readTags, writeTags } from './id3'
 import { setNamespace } from './env'
@@ -228,6 +229,8 @@ function installFakeLogin() {
 export function installFake(trackSeconds = 6, signedIn = true) {
   setNamespace('musicx-fake')
   setLocalSourceEnabled(false)
+  // I link finti sono blob leggibili dalla pagina: i download si provano anche qui.
+  setDirectLinks(true)
   setMemoryAuth(signedIn ? { token: 'fake', host: 'eapi.pcloud.com', kind: 'session' } : null)
   installFakeLogin()
   setTransport(async (method, params, _timeout, file) => {

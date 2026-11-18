@@ -4,10 +4,12 @@
 
 import { MediaSession as NativeSession } from '@capgo/capacitor-media-session'
 import { NATIVE_EXT } from '../config'
+import { canSave, discardBroken, playableUrl, savedOf, saveTrack, trimCache } from './audioStore'
 import { storageKey } from './env'
 import { extensionOf } from './library'
 import { forgetLocalSource, isLocalUrl, isRefererError, localUrl, whyNotPlayable } from './localSource'
 import { isNativeApp } from './native'
+import { isOnline } from './network'
 import { audioLink, fileLink, PCloudError } from './pcloud'
 import {
   appendToQueue,
@@ -55,6 +57,8 @@ let failures = 0
 let resumeAt = 0
 /** true da quando si cambia brano a quando il nuovo è pronto. */
 let switching = false
+/** Il brano corrente suona da un file salvato sul dispositivo. */
+let playingSaved = false
 
 const currentItem = (): QItem | undefined => {
   const state = playerStore.get()
@@ -92,7 +96,12 @@ async function load(options: { autoplay: boolean; at?: number; stage?: Stage }) 
   showMetadata(item)
 
   try {
-    const url = await resolveLink(item, transcoding)
+    // Scaricato o precaricato: parte subito e anche senza rete.
+    const saved = transcoding ? null : await playableUrl(item.id)
+    if (sequence !== loadSequence) return
+    playingSaved = saved !== null
+    if (!saved && !isOnline()) return skipToSaved()
+    const url = saved ?? (await resolveLink(item, transcoding))
     if (sequence !== loadSequence) return
     audio.src = url
     if (options.autoplay) await audio.play()
@@ -126,6 +135,12 @@ function unload() {
 function onMediaError(message: string) {
   const item = currentItem()
   if (!item) return
+  if (playingSaved) {
+    // Il file salvato è rovinato: si butta e si riprende il brano da pCloud.
+    playingSaved = false
+    discardBroken(item.id)
+    return void load({ autoplay: playerStore.get().playing, at: audio.currentTime || resumeAt, stage: 0 })
+  }
   links.delete(linkKey(item, transcoding))
   // rclone spento, o permesso di Chrome tolto: si ricontrolla prima di riprovare.
   if (isLocalUrl(audio.src)) forgetLocalSource()
@@ -159,12 +174,59 @@ function mediaErrorMessage(): string {
     : `Impossibile riprodurre "${title}".`
 }
 
-/** Prepara in anticipo il link del brano successivo, così il cambio non aspetta la rete. */
-function preloadNext() {
+/** Senza rete suonano solo i brani salvati sul dispositivo: si passa al prossimo che c'è. */
+function skipToSaved() {
   const state = playerStore.get()
-  const next = nextIndex(state, true)
-  const item = next === null ? undefined : state.items[next]
-  if (item && next !== state.index) void resolveLink(item, needsTranscode(item)).catch(() => {})
+  let index = state.index
+  for (let step = 0; step < state.items.length; step++) {
+    const next = nextIndex({ ...state, index }, false)
+    if (next === null || next === state.index) break
+    index = next
+    if (savedOf(state.items[index].id)) {
+      patch({ index, error: null })
+      return void load({ autoplay: state.playing })
+    }
+  }
+  stop('Sei offline e nella coda non ci sono brani scaricati su questo dispositivo.')
+}
+
+/** Quanti brani successivi si tengono pronti sul dispositivo, come fa Spotify. */
+const PREFETCH_COUNT = 2
+/** Si aspetta un po' prima di precaricare, per non rubare banda al brano appena partito. */
+const PREFETCH_DELAY_MS = 3000
+let prefetchRun = 0
+
+/** I prossimi brani nell'ordine in cui suoneranno (senza quello corrente). */
+function upcoming(count: number): QItem[] {
+  const state = playerStore.get()
+  const result: QItem[] = []
+  let index = state.index
+  while (result.length < count) {
+    const next = nextIndex({ ...state, index }, true)
+    if (next === null || next === state.index || next === index) break
+    index = next
+    result.push(state.items[index])
+  }
+  return result
+}
+
+/** Prepara il brano successivo: il link subito, poi i file dei prossimi brani sul dispositivo. */
+function preloadNext() {
+  const next = upcoming(1)[0]
+  if (next && !savedOf(next.id)) void resolveLink(next, needsTranscode(next)).catch(() => {})
+  const run = ++prefetchRun
+  setTimeout(() => void prefetch(run), PREFETCH_DELAY_MS)
+}
+
+async function prefetch(run: number) {
+  if (!canSave()) return
+  const items = upcoming(PREFETCH_COUNT).filter((item) => !needsTranscode(item))
+  for (const item of items) {
+    if (run !== prefetchRun || !isOnline()) return
+    if (!savedOf(item.id)) await saveTrack(item.id, item.file, 'cache')
+  }
+  const current = currentItem()
+  await trimCache(new Set([...items.map((item) => item.id), ...(current ? [current.id] : [])]))
 }
 
 function syncProgress() {

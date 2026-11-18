@@ -65,6 +65,50 @@ export function startLogin() {
   location.assign(`https://my.pcloud.com/oauth2/authorize?${query}`)
 }
 
+/** Il server API dell'account secondo pCloud (1 = USA, 2 = Europa). */
+const hostOf = (locationid: unknown) => (Number(locationid) === 2 ? 'eapi.pcloud.com' : 'api.pcloud.com')
+
+/** Una richiesta che aspetta il token finché l'accesso non è fatto (o pCloud chiude la connessione). */
+async function waitForToken(host: string, requestId: string, signal: AbortSignal): Promise<Auth> {
+  const query = new URLSearchParams({ client_id: PCLOUD_CLIENT_ID, request_id: requestId })
+  const response = await fetch(`https://${host}/oauth2_token?${query}`, { signal })
+  const data = (await response.json()) as { result?: number; access_token?: string; locationid?: number }
+  if (data.result !== 0 || !data.access_token) throw new Error(`pCloud: ${data.result}`)
+  return { token: data.access_token, host: hostOf(data.locationid), kind: 'oauth' }
+}
+
+/**
+ * Nell'app Android: la pagina di accesso di pCloud si apre in Chrome (il guscio apre lì gli indirizzi
+ * esterni) e l'app aspetta il token da pCloud, senza bisogno di tornare a un indirizzo registrato.
+ * È il metodo "poll_token" che usa l'SDK JavaScript ufficiale di pCloud. Finisce con l'accesso
+ * fatto, o con un errore se `signal` lo interrompe o passa troppo tempo.
+ */
+export async function appLogin(signal: AbortSignal): Promise<void> {
+  const requestId = randomState() + randomState()
+  const query = new URLSearchParams({ client_id: PCLOUD_CLIENT_ID, response_type: 'poll_token', request_id: requestId })
+  location.assign(`https://my.pcloud.com/oauth2/authorize?${query}`)
+
+  const deadline = Date.now() + 15 * 60_000
+  while (!signal.aborted && Date.now() < deadline) {
+    // Non si sa in quale regione è l'account: si aspetta su entrambi i server, vince chi risponde.
+    const round = new AbortController()
+    const stop = () => round.abort()
+    signal.addEventListener('abort', stop)
+    try {
+      const auth = await Promise.any(['api.pcloud.com', 'eapi.pcloud.com'].map((host) => waitForToken(host, requestId, round.signal)))
+      saveAuth(auth)
+      return
+    } catch {
+      // Connessione chiusa (app in sottofondo, rete cambiata) o accesso non ancora fatto: si riprova.
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+    } finally {
+      round.abort()
+      signal.removeEventListener('abort', stop)
+    }
+  }
+  throw new Error(signal.aborted ? 'Accesso annullato.' : 'Tempo scaduto: riprova.')
+}
+
 /**
  * Da chiamare all'avvio: se stiamo tornando da pCloud, il token è nel frammento dell'URL.
  * Viene accettato solo se `state` è quello generato da questa app e l'host è di pCloud.

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { authStore, consumeLoginRedirect } from './lib/auth'
 import { isNativeApp } from './lib/native'
 import { useStore } from './lib/store'
-import { updateStore, watchForUpdates } from './lib/update'
+import { applyUpdate, startUpdates, updateStore, watchForUpdates } from './lib/update'
 import './styles.css'
 import { Login } from './ui/Login'
 import { Main } from './ui/Main'
@@ -14,7 +14,7 @@ function UpdateBanner() {
   return (
     <div className="update-banner" role="status">
       <span>C'è una versione nuova di musicx.</span>
-      <button className="pill primary" onClick={() => location.reload()}>
+      <button className="pill primary" onClick={applyUpdate}>
         Aggiorna
       </button>
     </div>
@@ -43,6 +43,9 @@ async function start() {
     consumeLoginRedirect()
   }
 
+  // Nell'app Android: se è già scaricata un'interfaccia più nuova, si passa subito a quella.
+  if (import.meta.env.PROD && (await startUpdates())) return
+
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />
@@ -50,8 +53,8 @@ async function start() {
   )
 
   if (import.meta.env.PROD) {
-    // Nell'app Android il sito arriva sempre dalla rete attraverso il guscio nativo, che ci aggiunge
-    // il suo ponte: una copia in cache del service worker lo salterebbe.
+    // Nell'app Android l'interfaccia è dentro l'APK (o, quella vecchia, arriva dal sito attraverso il
+    // guscio nativo che ci aggiunge il suo ponte): il service worker non serve, e lo salterebbe.
     if ('serviceWorker' in navigator && !isNativeApp) navigator.serviceWorker.register('./sw.js').catch(() => {})
     watchForUpdates()
   }

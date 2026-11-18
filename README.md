@@ -13,8 +13,8 @@ allo stesso sito.
   permesso di accedere ai servizi del computer ("rete locale"). Se rclone smette di rispondere
   perché pCloud gli ha revocato l'accesso: `rclone config reconnect pcloud:` e poi
   `launchctl kickstart -k gui/$(id -u)/com.roberto.rclone-music-http`.
-- **Android**: l'app musicx (Capacitor) carica il sito pubblicato e chiede i link dal lato nativo
-  (`CapacitorHttp`, senza Origin né Referer). Il link vale per l'IP che l'ha chiesto, cioè il
+- **Android**: l'app musicx (Capacitor) ha dentro la stessa interfaccia del sito e chiede i link dal
+  lato nativo (`CapacitorHttp`, senza Origin né Referer). Il link vale per l'IP che l'ha chiesto, cioè il
   telefono, e l'`<audio>` della pagina lo suona. Notifica, schermata di blocco e musica a schermo
   spento li fa `@capgo/capacitor-media-session`. In Chrome sul telefono i brani non suonano: il
   menu ⋯ offre di scaricare l'app.
@@ -22,9 +22,13 @@ allo stesso sito.
 ## App Android
 
 Si scarica da <https://github.com/robotlabs/musicx/releases/latest/download/musicx.apk> e si
-installa una volta (Android chiede di consentire le app da origine sconosciuta). L'interfaccia
-arriva dal sito, quindi si aggiorna da sola a ogni pubblicazione; l'APK va rifatto solo quando
-cambia la parte nativa (`android/`, `capacitor.config.ts`, dipendenze): lo fa
+installa una volta (Android chiede di consentire le app da origine sconosciuta). L'interfaccia sta
+dentro l'APK, così l'app si apre anche senza rete; quando c'è rete legge `version.json` dal sito e,
+se c'è una versione nuova, la scarica nei file dell'app e la usa da lì (`src/lib/appUpdate.ts`,
+`WebView.setServerBasePath`): al prossimo avvio, o subito con "Aggiorna". I file locali sono serviti
+come `https://robotlabs.github.io`, la stessa origine del sito che le versioni vecchie caricavano:
+accesso, coda e libreria restano. L'APK va rifatto solo quando cambia la parte nativa (`android/`,
+`capacitor.config.ts`, dipendenze): lo fa
 `.github/workflows/android.yml`, che lo firma sempre con la stessa chiave (segreti
 `MUSICX_KEYSTORE_*`; l'originale è sul Mac in `~/.config/musicx/android/`) e lo mette in una
 release. Senza quella chiave un APK nuovo non si installa sopra il vecchio.
@@ -44,6 +48,23 @@ cd android && ./gradlew installDebug
   i numeri siano tutti diversi. Trascinando la maniglia ⠿ di un brano (cartelle di soli mp3) il
   nuovo ordine diventa il numero di traccia scritto nei file, 1, 2, 3…: l'indice cambia subito e i
   file si riscrivono in sottofondo, solo quelli col numero cambiato (oltre 20 file chiede prima).
+- **Precaricamento**: mentre suona un brano i 2 successivi si scaricano sul dispositivo, così il
+  cambio è immediato e riascoltarli non usa la rete. Stanno in una cache con un limite (1 GB, si
+  cambia in "Download e spazio"): quando è piena escono i meno ascoltati.
+- **Download per l'ascolto offline**: "Scarica" dal ⋯ di un brano, di più brani, di una cartella o
+  di una playlist (o con il pulsante ⬇ nell'intestazione), come in Spotify; i brani scaricati hanno
+  il segno verde. Si ricorda la scelta, non i file: una playlist scaricata segue pCloud (i brani
+  aggiunti si scaricano, quelli tolti spariscono), e così una cartella. Senza rete libreria e
+  playlist si vedono lo stesso (le playlist hanno una copia sul dispositivo), i brani non salvati
+  sono spenti e il lettore salta a quelli che ci sono. "Download e spazio" (menu ⋯ dell'app) dice
+  quanto occupano e ha "Pulisci tutto": via download, precaricati e copia di libreria e playlist,
+  si resta dentro. Nell'app Android i file stanno nella memoria privata dell'app e li scarica il
+  lato nativo (`@capacitor/file-transfer`: i server dei file di pCloud non lasciano leggere i brani
+  a una pagina); sul Mac arrivano da rclone e stanno nello spazio privato di Chrome (OPFS). Si
+  suonano da un blob. Elenco e scelte stanno in file accanto ai brani (`index.json`, `pins.json`),
+  non in localStorage, che nell'app può perdere le ultime scritture se viene chiusa di forza;
+  comandano comunque i file: un brano non si butta mai solo perché manca dall'elenco
+  (`src/lib/audioStore.ts`, `src/lib/downloads.ts`).
 - **Sposta in cartella**: dal ⋯ di un brano, di più brani selezionati o di una cartella. Si sceglie la
   cartella navigando quelle vere di pCloud (anche le vuote) e se ne può creare una nuova; in cima
   c'è l'ultima usata. Sul Mac basta trascinare brani o cartelle su una cartella della lista o del
@@ -97,19 +118,21 @@ finto non entra nella build di produzione.
 
 ## Accesso a pCloud
 
-Due modi, una volta per dispositivo:
+Si accede una volta per dispositivo, con email e password (OAuth c'è, ma è spento):
 
 - **Email e password**: vanno solo a pCloud (`userinfo` con `getauth`), che restituisce un token di
   sessione. Se pCloud chiede un codice (2FA o conferma di un dispositivo nuovo via email) l'app lo
   chiede a sua volta; questi passi non sono documentati da pCloud e seguono
   [go-pcloud](https://github.com/StarHack/go-pcloud). Funziona senza nessuna app registrata.
-- **OAuth** ("Accedi con pCloud"): l'app pCloud è approvata e il suo Client ID è in `src/config.ts`.
-  È il pulsante principale e email e password restano come riserva. Compare solo sul sito
-  pubblicato: pCloud accetta un solo Redirect URI, `https://robotlabs.github.io/musicx/`, identico
-  (in sviluppo su `localhost` resta email e password). Nell'app Android non compare: la pagina di
-  pCloud si aprirebbe in Chrome e il token finirebbe lì invece che nell'app.
+  La sessione dura il massimo che pCloud concede: 2 anni, e scade solo dopo 62 giorni senza usarla.
+- **OAuth** ("Accedi con pCloud"): spento (`OAUTH_LOGIN` in `src/config.ts`). L'app pCloud
+  "robotlabs-music" è approvata e funziona, ma con un token OAuth pCloud dà libreria e brani e non
+  le playlist: `collection_list` risponde 1000 "Log in required". Il codice resta pronto: sul sito
+  pCloud riporta all'unico Redirect URI registrato, `https://robotlabs.github.io/musicx/`; nell'app
+  la pagina di pCloud si apre in Chrome e l'app aspetta il token con `response_type=poll_token`
+  (`oauth2_token` con `request_id`, come l'SDK JavaScript di pCloud), senza indirizzo di ritorno.
 
-Com'è configurato OAuth (già fatto, app "robotlabs-music"):
+Com'è configurato OAuth (già fatto, app "robotlabs-music", oggi spento):
 
 1. Su <https://docs.pcloud.com/my_apps/> un'app con accesso a **tutto** il drive (non solo alla
    cartella dell'app), approvata da pCloud.
@@ -139,7 +162,10 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 - `src/lib/pcloud.ts` – chiamate all'API pCloud
 - `src/lib/auth.ts`, `src/lib/passwordLogin.ts` – accesso OAuth e con email e password
 - `src/lib/library.ts` – indice della libreria, ricerca, cache in IndexedDB
-- `src/lib/player.ts` – elemento audio, coda, Media Session, tentativi di recupero
+- `src/lib/player.ts` – elemento audio, coda, Media Session, tentativi di recupero, precaricamento
+- `src/lib/audioStore.ts`, `src/lib/downloads.ts` – brani salvati sul dispositivo e download offline
+- `src/lib/network.ts` – c'è rete o no (nell'app lo dice il lato nativo)
+- `src/lib/appUpdate.ts` – nell'app, la versione nuova dell'interfaccia scaricata dal sito
 - `src/lib/localSource.ts` – i brani da rclone sul Mac, permesso "rete locale", messaggi d'errore
 - `src/lib/native.ts` – cosa cambia dentro l'app Android (link di pCloud dal lato nativo)
 - `android/`, `capacitor.config.ts`, `assets/` – il guscio Android e le sorgenti delle sue icone

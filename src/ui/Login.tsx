@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
-import { authStore, loginConfigured, startLogin } from '../lib/auth'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { OAUTH_LOGIN, PCLOUD_CLIENT_ID } from '../config'
+import { appLogin, authStore, loginConfigured, startLogin } from '../lib/auth'
 import { isNativeApp } from '../lib/native'
 import { completeLogin, passwordLogin, type Challenge, type LoginStep } from '../lib/passwordLogin'
 import { useStore } from '../lib/store'
@@ -106,21 +107,64 @@ function PasswordLogin({ autoFocus }: { autoFocus: boolean }) {
   )
 }
 
+/** Nell'app: si accede nella pagina di pCloud aperta in Chrome, e intanto qui si aspetta. */
+function useAppLogin() {
+  const [waiting, setWaiting] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  const controller = useRef<AbortController | null>(null)
+  useEffect(() => () => controller.current?.abort(), [])
+  const start = () => {
+    controller.current?.abort()
+    const current = new AbortController()
+    controller.current = current
+    setProblem(null)
+    setWaiting(true)
+    appLogin(current.signal).catch((error: unknown) => {
+      if (controller.current !== current) return
+      setWaiting(false)
+      if (!current.signal.aborted) setProblem(error instanceof Error ? error.message : 'Accesso non riuscito.')
+    })
+  }
+  const cancel = () => {
+    controller.current?.abort()
+    controller.current = null
+    setWaiting(false)
+  }
+  return { waiting, problem, start, cancel }
+}
+
 export function Login() {
   const { notice } = useStore(authStore)
   // Con l'app pCloud approvata l'accesso principale è quello OAuth; email e password restano di riserva.
-  // Non nell'app Android: la pagina di pCloud si aprirebbe in Chrome e il token finirebbe lì.
-  const oauth = loginConfigured() && !isNativeApp
+  // Sul sito pCloud riporta qui con il token; nell'app la pagina di pCloud si apre in Chrome e l'app
+  // aspetta il token da pCloud.
+  const inApp = OAUTH_LOGIN && isNativeApp && PCLOUD_CLIENT_ID !== ''
+  const oauth = inApp || (OAUTH_LOGIN && loginConfigured() && !isNativeApp)
   const [withPassword, setWithPassword] = useState(!oauth)
+  const app = useAppLogin()
+
+  if (app.waiting) {
+    return (
+      <main className="login">
+        <img src="./favicon.svg" alt="" width="84" height="84" />
+        <h1>musicx</h1>
+        <div className="spinner" aria-hidden="true" />
+        <p className="dim">Accedi nella pagina di pCloud che si è aperta, poi torna qui: l'app entra da sola.</p>
+        <button className="text-button" onClick={app.cancel}>
+          Annulla
+        </button>
+      </main>
+    )
+  }
 
   return (
     <main className="login">
       <img src="./favicon.svg" alt="" width="84" height="84" />
       <h1>musicx</h1>
       <p className="dim">La tua musica, direttamente da pCloud.</p>
-      {notice && <p className="login-notice">{notice}</p>}
+      {(app.problem ?? notice) && <p className="login-notice">{app.problem ?? notice}</p>}
       {oauth && (
-        <button className="pill primary big" onClick={startLogin}>
+        <button className="pill primary big" onClick={inApp ? app.start : startLogin}>
           Accedi con pCloud
         </button>
       )}

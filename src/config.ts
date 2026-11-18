@@ -7,6 +7,13 @@ export const MUSIC_ROOT = '/rob/music'
  */
 export const PCLOUD_CLIENT_ID: string = 'jDr9tOaTl7L'
 
+/**
+ * Il pulsante "Accedi con pCloud" è spento: con un token OAuth pCloud dà libreria e brani ma non le
+ * playlist (collection_list risponde 1000 "Log in required"). Il codice resta pronto (sul sito torna
+ * a questo indirizzo, nell'app aspetta il token con "poll_token") se un giorno pCloud lo permette.
+ */
+export const OAUTH_LOGIN = false
+
 /** L'unico Redirect URI che pCloud accetta per quell'app (lo vuole identico): altrove niente OAuth. */
 export const PCLOUD_REDIRECT_URI = 'https://robotlabs.github.io/musicx/'
 

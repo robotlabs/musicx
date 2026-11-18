@@ -13,7 +13,9 @@ import { saveAuth } from './auth'
 const HOSTS = ['api.pcloud.com', 'eapi.pcloud.com']
 const HOST_KEY = 'musicx.login-host'
 const DEVICE_KEY = 'musicx.device-id'
-const ONE_YEAR = 365 * 24 * 60 * 60
+/** I massimi che pCloud concede: la sessione dura 2 anni e scade solo dopo 62 giorni senza usarla. */
+const AUTH_EXPIRE = 63_072_000
+const AUTH_INACTIVE_EXPIRE = 5_356_800
 
 /** Codici di pCloud usati qui. */
 const LOGIN_FAILED = 2000
@@ -104,7 +106,13 @@ function deviceName(): string {
   return `musicx (${/Android/i.test(agent) ? 'Android' : /Mac/i.test(agent) ? 'Mac' : 'browser'})`
 }
 
-const device = () => ({ device: deviceName(), deviceid: deviceId(), getauth: 1, authexpire: ONE_YEAR })
+const device = () => ({
+  device: deviceName(),
+  deviceid: deviceId(),
+  getauth: 1,
+  authexpire: AUTH_EXPIRE,
+  authinactiveexpire: AUTH_INACTIVE_EXPIRE,
+})
 
 const credentials = (email: string, password: string) => ({ username: email, password, logout: 1, ...device() })
 

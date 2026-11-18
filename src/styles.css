@@ -10,6 +10,7 @@
   --accent-fill: #7557f0;
   --on-accent: #ffffff;
   --danger: #ff7575;
+  --saved: #1ed760;
   --row-h: 58px;
   --radius: 12px;
 }
@@ -26,6 +27,7 @@
     --accent: #6444dd;
     --accent-fill: #6444dd;
     --danger: #cf3636;
+    --saved: #15924a;
   }
 }
 
@@ -1428,4 +1430,77 @@ code.block {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------- Download e spazio ---------- */
+
+/* Segno verde dei brani, cartelle e playlist scaricati (come in Spotify). */
+.saved-mark {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-right: 5px;
+  color: var(--saved);
+}
+
+/* Senza rete i brani non salvati sul dispositivo non suonano. */
+.row.unavailable .row-main {
+  opacity: 0.4;
+}
+
+.download-toggle.on {
+  color: var(--saved);
+}
+
+.storage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0 28px;
+  max-width: 640px;
+}
+
+.storage h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+}
+
+.storage p {
+  margin: 0;
+}
+
+.storage .rows {
+  width: 100%;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: var(--raised);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.chip.on {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.pill.small {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.pill.danger {
+  color: var(--danger);
 }

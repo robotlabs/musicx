@@ -1,7 +1,11 @@
 // Pezzi riusati da più viste: riga di un brano, messaggi a tutta pagina.
 
 import type { CSSProperties, MouseEvent, ReactNode } from 'react'
+import { audioStore } from '../lib/audioStore'
+import { onlineStore } from '../lib/network'
 import type { QItem } from '../lib/queue'
+import { useStore } from '../lib/store'
+import { SavedMark } from './downloadActions'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
 
@@ -33,7 +37,17 @@ export function TrackRow(props: {
 }) {
   const { item, active, onSelect } = props
   const drag = props.drag ? dragTracks(props.drag) : {}
-  const className = ['row', active && 'active', props.selected && 'selected', onSelect && 'selectable', props.className]
+  const saved = useStore(audioStore, (state) => state.files[item.id]?.kind)
+  // Senza rete i brani non salvati sul dispositivo non suonano: si vedono spenti.
+  const online = useStore(onlineStore)
+  const className = [
+    'row',
+    active && 'active',
+    props.selected && 'selected',
+    onSelect && 'selectable',
+    !online && !saved && !active && 'unavailable',
+    props.className,
+  ]
   return (
     <li className={className.filter(Boolean).join(' ')} style={props.style} {...drag}>
       {props.leading}
@@ -65,7 +79,12 @@ export function TrackRow(props: {
         </span>
         <span className="row-text">
           <span className="row-title">{item.title}</span>
-          {item.sub && <span className="row-sub">{item.sub}</span>}
+          {(item.sub || saved === 'download') && (
+            <span className="row-sub">
+              {saved === 'download' && <SavedMark />}
+              {item.sub}
+            </span>
+          )}
         </span>
       </button>
       <button className="icon-button" aria-label={`Azioni per ${item.title}`} onClick={props.onMenu}>
