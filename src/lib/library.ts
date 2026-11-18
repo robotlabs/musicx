@@ -4,7 +4,7 @@
 import { AUDIO_EXT, LIBRARY_MAX_AGE_MS, MUSIC_ROOT } from '../config'
 import { storageKey } from './env'
 import { idbDel, idbGet, idbSet } from './idb'
-import { listTree, PCloudError, type RawMeta } from './pcloud'
+import { latestDiffId, listTree, PCloudError, type RawMeta } from './pcloud'
 import type { QItem } from './queue'
 import { createStore } from './store'
 
@@ -29,6 +29,9 @@ export interface Track {
   album?: string
   /** Numero di traccia dal tag ("3" o "3/12"). */
   track?: string
+  /** Impronta del contenuto secondo pCloud e dimensione: due file uguali hanno le stesse. */
+  hash?: string
+  size?: number
 }
 
 export interface Library {
@@ -36,6 +39,10 @@ export interface Library {
   folders: Map<number, Folder>
   tracks: Map<number, Track>
   builtAt: number
+  /** L'ultimo cambiamento di pCloud già dentro l'indice: da lì si aggiorna da solo (liveLibrary.ts). */
+  diffid?: number
+  /** Tutte le cartelle sotto la radice, anche quelle senza musica (che `folders` non ha). */
+  tree?: Map<number, FolderPlace>
 }
 
 /**
@@ -51,6 +58,9 @@ interface StoredLibrary {
   folders: Folder[]
   tracks: Track[]
   builtAt: number
+  diffid?: number
+  /** [id, cartella madre, nome] di ogni cartella. */
+  tree?: [number, number, string][]
 }
 
 const collator = new Intl.Collator('it', { numeric: true, sensitivity: 'base' })
@@ -104,9 +114,11 @@ export function sortFolderTracks(ids: number[], tracks: Map<number, Track>): num
 export function buildLibrary(root: RawMeta, builtAt = Date.now()): Library {
   const folders = new Map<number, Folder>()
   const tracks = new Map<number, Track>()
+  const tree = new Map<number, FolderPlace>()
 
   const walk = (raw: RawMeta, parent: number): number => {
     const id = raw.folderid!
+    tree.set(id, { parent, name: raw.name })
     const folder: Folder = { id, parent, name: raw.name, folders: [], tracks: [], total: 0 }
     for (const child of raw.contents ?? []) {
       // File nascosti e doppioni "._nome" creati da macOS.
@@ -118,12 +130,7 @@ export function buildLibrary(root: RawMeta, builtAt = Date.now()): Library {
           folder.total += inside
         }
       } else if (child.fileid !== undefined && AUDIO_EXT.has(extensionOf(child.name))) {
-        tracks.set(child.fileid, {
-          id: child.fileid,
-          parent: id,
-          name: child.name,
-          ...trackTags(child),
-        })
+        tracks.set(child.fileid, trackFrom(child, id))
         folder.tracks.push(child.fileid)
       }
     }
@@ -135,8 +142,18 @@ export function buildLibrary(root: RawMeta, builtAt = Date.now()): Library {
   }
 
   walk(root, -1)
-  return { rootId: root.folderid!, folders, tracks, builtAt }
+  return { rootId: root.folderid!, folders, tracks, builtAt, tree }
 }
+
+/** Un brano dai metadati di pCloud. */
+export const trackFrom = (raw: RawMeta, parent: number): Track => ({
+  id: raw.fileid!,
+  parent,
+  name: raw.name,
+  ...trackTags(raw),
+  hash: raw.hash === undefined ? undefined : String(raw.hash),
+  size: raw.size,
+})
 
 export const trackTitle = (track: Track) => track.title ?? stripExtension(track.name)
 
@@ -277,8 +294,11 @@ async function readCache(): Promise<Library | null> {
       // Si riordina ogni volta: un indice salvato da una versione precedente può avere l'ordine di allora.
       folders: new Map(stored.folders.map((folder) => [folder.id, { ...folder, tracks: sortFolderTracks(folder.tracks, tracks) }])),
       tracks,
-      // Un indice vecchio vale come scaduto: si vede subito e intanto si rilegge.
-      builtAt: stored.version < CACHE_VERSION ? 0 : stored.builtAt,
+      // Un indice vecchio vale come scaduto: si vede subito e intanto si rilegge. Così anche uno
+      // salvato prima che la libreria si aggiornasse da sola (senza diffid).
+      builtAt: stored.version < CACHE_VERSION || stored.diffid === undefined || !stored.tree ? 0 : stored.builtAt,
+      diffid: stored.diffid,
+      tree: stored.tree && new Map(stored.tree.map(([id, parent, name]) => [id, { parent, name }])),
     }
     return withChanges(library, readEdits())
   } catch {
@@ -295,6 +315,8 @@ async function writeCache(library: Library) {
     folders: [...library.folders.values()],
     tracks: [...library.tracks.values()],
     builtAt: library.builtAt,
+    diffid: library.diffid,
+    tree: library.tree && [...library.tree].map(([id, place]) => [id, place.parent, place.name]),
   }
   // Senza cache l'app funziona lo stesso: rilegge la libreria al prossimo avvio.
   await idbSet(cacheKey(), stored).then(
@@ -326,7 +348,9 @@ export function refreshLibrary(): Promise<void> {
     const during: Edits = { tracks: new Map(), folders: new Map() }
     changedDuringRefresh = during
     try {
-      const library = withChanges(buildLibrary(await listTree(MUSIC_ROOT)), during)
+      // Il numero dell'ultimo cambiamento si prende prima di leggere: quelli successivi arrivano dopo.
+      const diffid = await latestDiffId().catch(() => undefined)
+      const library = withChanges({ ...buildLibrary(await listTree(MUSIC_ROOT)), diffid }, during)
       libraryStore.set({ status: 'ready', library, error: null, refreshing: false })
       await writeCache(library)
     } catch (error) {
@@ -377,6 +401,7 @@ function withChanges(library: Library, { tracks: changes, folders: places }: Edi
   if (!changes.size && !places.size) return library
   const tracks = new Map(library.tracks)
   const folders = new Map(library.folders)
+  const tree = new Map(library.tree ?? [])
   const copied = new Set<number>()
   const own = (id: number): Folder | undefined => {
     const folder = folders.get(id)
@@ -405,6 +430,7 @@ function withChanges(library: Library, { tracks: changes, folders: places }: Edi
     if (!parentKnown || isWithin(wanted.parent, id)) return false
     const current = folders.get(id)
     if (current && current.parent === wanted.parent && current.name === wanted.name) return true
+    tree.set(id, wanted)
     if (!current) {
       folders.set(id, { id, parent: wanted.parent, name: wanted.name, folders: [], tracks: [], total: 0 })
       copied.add(id)
@@ -449,7 +475,7 @@ function withChanges(library: Library, { tracks: changes, folders: places }: Edi
     const folder = own(id)
     if (folder) folder.tracks = sortFolderTracks(folder.tracks, tracks)
   }
-  return { ...library, tracks, folders }
+  return { ...library, tracks, folders, tree }
 }
 
 /**
@@ -471,6 +497,20 @@ export function updateTracks(changes: Map<number, TrackChange>, folders: Map<num
   clearTimeout(saveTimer)
   saveTimer = setTimeout(saveNow, 1500)
 }
+
+/**
+ * Mette al posto dell'indice uno già aggiornato (dai cambiamenti di pCloud, vedi liveLibrary.ts) e lo
+ * salva con calma. Durante una rilettura completa non serve: i cambiamenti arrivano di nuovo dopo.
+ */
+export function commitLibrary(next: Library) {
+  if (refreshInFlight) return
+  libraryStore.set((state) => ({ ...state, library: next }))
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(saveNow, 1500)
+}
+
+/** true mentre si rilegge tutta la libreria da pCloud. */
+export const refreshingLibrary = () => refreshInFlight !== null
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 

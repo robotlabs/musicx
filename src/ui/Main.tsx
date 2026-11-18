@@ -4,6 +4,7 @@ import { initAudioStore } from '../lib/audioStore'
 import { clearAuth } from '../lib/auth'
 import { forgetSavedMusic } from '../lib/cleanup'
 import { initDownloads } from '../lib/downloads'
+import { startLiveLibrary, stopLiveLibrary } from '../lib/liveLibrary'
 import { clearLibrary, initLibrary, libraryStore, refreshLibrary } from '../lib/library'
 import { isOpen, loadOpenGroups, openGroupsStore, setGroupOpen, toggleGroup } from '../lib/openGroups'
 import { ANDROID_APP_URL, isAndroidBrowser } from '../lib/native'
@@ -20,6 +21,9 @@ import { PlaylistView } from './PlaylistView'
 import { QueueView } from './QueueView'
 import { SearchView } from './SearchView'
 import { StorageView } from './StorageView'
+import { DuplicatesView } from './DuplicatesView'
+import { YouTubeView } from './YouTubeView'
+import { youtubeHere } from '../lib/youtube'
 import { offersDownloads } from './downloadActions'
 import { addTracksTo } from './actions'
 import { dragPlaylist, useDropTargets } from './drag'
@@ -32,6 +36,7 @@ import { tracksLabel } from './text'
 async function logout() {
   const sure = await confirmAction('Uscire da pCloud?', 'Su questo dispositivo dovrai accedere di nuovo. Musica e playlist restano su pCloud.', 'Esci')
   if (!sure) return
+  stopLiveLibrary()
   resetPlayer()
   resetPlaylists()
   await forgetSavedMusic()
@@ -61,6 +66,7 @@ function openAppMenu() {
       ...(offersDownloads()
         ? [{ label: 'Download e spazio', icon: 'storage' as const, onSelect: () => navigate({ name: 'storage' }) }]
         : []),
+      { label: 'Trova doppioni', icon: 'duplicates', onSelect: () => navigate({ name: 'duplicates' }) },
       // In Chrome sul telefono i brani non suonano: l'app sì.
       ...(isAndroidBrowser
         ? [{ label: "Scarica l'app per Android", icon: 'upload' as const, onSelect: () => location.assign(ANDROID_APP_URL) }]
@@ -132,6 +138,8 @@ const sections: { route: Route; label: string; icon: IconName; match: Route['nam
   { route: { name: 'folder', id: null }, label: 'Libreria', icon: 'music', match: ['folder', 'search'] },
   { route: { name: 'playlists' }, label: 'Playlist', icon: 'list', match: ['playlists', 'playlist'] },
   { route: { name: 'queue' }, label: 'Coda', icon: 'queue', match: ['queue'] },
+  // Solo sul Mac, dove c'è il servizio che scarica da YouTube.
+  ...(youtubeHere() ? [{ route: { name: 'youtube' } as Route, label: 'Da YouTube', icon: 'video' as IconName, match: ['youtube'] as Route['name'][] }] : []),
 ]
 
 function SidePlaylists({ route }: { route: Route }) {
@@ -303,6 +311,7 @@ export function Main() {
     initPlayer()
     restorePlaylists()
     void initLibrary()
+    startLiveLibrary()
     void refreshPlaylists()
     void initAudioStore().then(initDownloads)
     accountEmail().then(
@@ -344,6 +353,8 @@ export function Main() {
         {route.name === 'playlist' && <PlaylistView id={route.id} key={route.id} />}
         {route.name === 'queue' && <QueueView />}
         {route.name === 'storage' && <StorageView />}
+        {route.name === 'duplicates' && <DuplicatesView />}
+        {route.name === 'youtube' && <YouTubeView />}
       </main>
       <PlayerBar />
       <Tabs route={route} />

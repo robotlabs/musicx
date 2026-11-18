@@ -42,6 +42,12 @@ cd android && ./gradlew installDebug
 ```
 
 - **Libreria**: tutto l'albero di `/rob/music` letto in una chiamata e salvato nel browser.
+  Poi si aggiorna da sola: quello che cambia su pCloud (dall'app di pCloud, dal Finder via rclone,
+  da un altro dispositivo) arriva in pochi secondi senza rileggere tutto. È `diff` di pCloud: una
+  richiesta resta aperta finché succede qualcosa e ogni evento porta i metadati completi del file;
+  l'indice ricorda l'ultimo cambiamento che contiene, così all'avvio recupera quelli persi
+  (`src/lib/liveLibrary.ts`). Una cartella arrivata da fuori della libreria, di cui non si conosce
+  il contenuto, fa rileggere tutto.
   Navigazione per cartelle e ricerca istantanea su titolo, artista, album e nome cartella.
   In una cartella con un album solo i brani seguono il numero di traccia (dal tag o, se manca, dal
   nome del file: "Track-06"); nelle cartelle con più album vanno in ordine alfabetico, a meno che
@@ -71,6 +77,18 @@ cd android && ./gradlew installDebug
   percorso in alto. Sposta pCloud (`renamefile`/`renamefolder` con `tofolderid`): stesso fileid,
   quindi i brani restano nelle playlist. Un file con lo stesso nome già là non viene sostituito:
   quel brano resta dov'è. L'indice si aggiorna subito; rclone se ne accorge da solo in pochi secondi.
+- **Doppioni** (menu ⋯ dell'app, "Trova doppioni"): i file identici (stessa impronta e dimensione
+  secondo pCloud) e lo stesso brano in file diversi (stesso artista e titolo, per esempio un mp3 e un
+  flac). Per ogni copia: ascoltarla, andare alla sua cartella, "Tieni questo, elimina gli altri" o
+  "Elimina"; si eliminano nel cestino di pCloud, da dove si recuperano.
+- **Da YouTube** (solo Mac, nella barra laterale): scrivi il titolo, scegli il video, e il brano
+  diventa un mp3 nella cartella dell'artista su pCloud (quella che c'è già, cercata per nome o per i
+  tag dei brani; altrimenti una nuova in `/rob/music`), con nome `Artista - Titolo.mp3`. Artista,
+  titolo, album, numero, anno e copertina arrivano dal catalogo di iTunes e si possono correggere;
+  la cartella si può cambiare. Lo fa un piccolo servizio sul Mac (`helper/youtube-helper.mjs`, solo
+  Node, yt-dlp e ffmpeg), che la pagina trova su `127.0.0.1:8621` (o le porte successive, fino alla
+  8630) e che risponde solo a musicx. I termini di YouTube non permettono di scaricare: è per uso
+  personale.
 - **Playlist**: sono le playlist native di pCloud (API `collection_*`), quindi le stesse su ogni
   dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando o, dal ⋯,
   "Ordina per numero di traccia" (album nell'ordine in cui compaiono, dentro il numero), import dei
@@ -100,6 +118,21 @@ cd android && ./gradlew installDebug
   A schermo spento e con i tasti multimediali funziona grazie alla Media Session di Chrome.
   Il ⋯ accanto al brano che suona apre il suo menu (aggiungi a playlist, vai alla cartella,
   modifica info); sul Mac il brano si trascina dalla barra in basso su una playlist.
+
+## Servizio YouTube sul Mac
+
+Si installa una volta (parte da solo all'accesso, log in `~/Library/Logs/musicx/helper.log`):
+
+```bash
+brew install yt-dlp ffmpeg
+./helper/install.sh
+```
+
+`./helper/install.sh remove` lo toglie. Se YouTube risponde "Sign in to confirm you're not a bot",
+`./helper/install.sh --cookies chrome` fa usare a yt-dlp l'accesso a YouTube di Chrome (macOS chiede
+una volta il permesso per il portachiavi). Quando YouTube cambia qualcosa basta `brew upgrade yt-dlp`.
+Per provare l'app senza scaricare niente: `MUSICX_HELPER_FAKE_DOWNLOAD=1 node helper/youtube-helper.mjs`
+(al posto del brano, qualche secondo di tono; ricerca e catalogo restano veri).
 
 ## Sviluppo
 
@@ -166,6 +199,9 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 - `src/lib/audioStore.ts`, `src/lib/downloads.ts` – brani salvati sul dispositivo e download offline
 - `src/lib/network.ts` – c'è rete o no (nell'app lo dice il lato nativo)
 - `src/lib/appUpdate.ts` – nell'app, la versione nuova dell'interfaccia scaricata dal sito
+- `src/lib/liveLibrary.ts` – la libreria che segue pCloud (`diff`)
+- `src/lib/duplicates.ts` – doppioni
+- `src/lib/youtube.ts`, `helper/` – "Da YouTube" e il servizio sul Mac
 - `src/lib/localSource.ts` – i brani da rclone sul Mac, permesso "rete locale", messaggi d'errore
 - `src/lib/native.ts` – cosa cambia dentro l'app Android (link di pCloud dal lato nativo)
 - `android/`, `capacitor.config.ts`, `assets/` – il guscio Android e le sorgenti delle sue icone

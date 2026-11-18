@@ -2,10 +2,24 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RawMeta } from './pcloud'
 
 // pCloud finto: l'elenco della libreria arriva quando lo decide il test.
-let deliver: (root: RawMeta) => void = () => {}
+// L'elenco può arrivare prima che la libreria lo chieda (prima chiede il numero dell'ultimo cambiamento).
+let queued: RawMeta | null = null
+let waiting: ((root: RawMeta) => void) | null = null
+const deliver = (root: RawMeta) => {
+  if (waiting) waiting(root)
+  else queued = root
+  waiting = null
+}
+const nextListing = () =>
+  new Promise<RawMeta>((resolve) => {
+    if (queued) resolve(queued)
+    else waiting = resolve
+    queued = null
+  })
 vi.mock('./pcloud', () => ({
   PCloudError: class extends Error {},
-  listTree: () => new Promise<RawMeta>((resolve) => (deliver = resolve)),
+  latestDiffId: async () => 1,
+  listTree: nextListing,
 }))
 
 const { libraryStore, refreshLibrary, updateTracks } = await import('./library')

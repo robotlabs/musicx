@@ -31,6 +31,8 @@ function FolderPicker(props: {
   current: number | null
   /** La cartella che si sta spostando: non ci si può entrare. */
   blocked: number | null
+  /** Il pulsante che conferma (di solito "Sposta qui"). */
+  confirm?: string
   onDone: (trail: Step[] | null) => void
 }) {
   const [trail, setTrail] = useState(props.start)
@@ -134,7 +136,7 @@ function FolderPicker(props: {
       <div className="dialog-actions picker-actions">
         <button onClick={() => props.onDone(null)}>Annulla</button>
         <button className="primary" disabled={!canMoveHere} onClick={() => props.onDone(trail)}>
-          Sposta qui
+          {props.confirm ?? 'Sposta qui'}
         </button>
       </div>
     </div>
@@ -142,14 +144,25 @@ function FolderPicker(props: {
 }
 
 /** Fa scegliere una cartella. Restituisce il percorso fino a quella scelta, o null se annullato. */
-function chooseFolder(title: string, options: { start: Step[]; current: number | null; blocked?: number }): Promise<Step[] | null> {
+/** Fa scegliere una cartella vera di pCloud (anche vuota, o nuova). Restituisce il percorso fino a lì. */
+export function chooseFolder(
+  title: string,
+  options: { start: Step[]; current: number | null; blocked?: number; confirm?: string },
+): Promise<Step[] | null> {
   return new Promise((resolve) => {
     const done = (trail: Step[] | null) => {
       closeSheet()
       resolve(trail)
     }
     showSheet(
-      <FolderPicker title={title} start={options.start} current={options.current} blocked={options.blocked ?? null} onDone={done} />,
+      <FolderPicker
+        title={title}
+        start={options.start}
+        current={options.current}
+        blocked={options.blocked ?? null}
+        confirm={options.confirm}
+        onDone={done}
+      />,
       () => resolve(null),
     )
   })

@@ -4,10 +4,24 @@ import type { RawMeta } from './pcloud'
 // pCloud finto: cosa c'è in ogni cartella (solo i nomi, per i doppioni) e cosa si è spostato.
 const names = new Map<number, string[]>()
 const moves: [number, number][] = []
-let deliver: (root: RawMeta) => void = () => {}
+// L'elenco può arrivare prima che la libreria lo chieda (prima chiede il numero dell'ultimo cambiamento).
+let queued: RawMeta | null = null
+let waiting: ((root: RawMeta) => void) | null = null
+const deliver = (root: RawMeta) => {
+  if (waiting) waiting(root)
+  else queued = root
+  waiting = null
+}
+const nextListing = () =>
+  new Promise<RawMeta>((resolve) => {
+    if (queued) resolve(queued)
+    else waiting = resolve
+    queued = null
+  })
 vi.mock('./pcloud', () => ({
   PCloudError: class extends Error {},
-  listTree: () => new Promise<RawMeta>((resolve) => (deliver = resolve)),
+  latestDiffId: async () => 1,
+  listTree: nextListing,
   listFolder: async (folderid: number) => ({ name: '', isfolder: true, folderid, contents: (names.get(folderid) ?? []).map((name) => ({ name, isfolder: false })) }),
   moveFile: async (fileid: number, tofolderid: number) => {
     moves.push([fileid, tofolderid])

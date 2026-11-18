@@ -102,6 +102,16 @@ export interface RawMeta {
   trackno?: number | string
   /** Solo dentro una playlist: posizione (da 1). */
   position?: number
+  /** Impronta del contenuto (64 bit: in JavaScript arriva arrotondata, basta per trovare i doppioni). */
+  hash?: number
+  size?: number
+}
+
+/** Un cambiamento nell'account, come lo racconta `diff`. */
+export interface DiffEntry {
+  event: string
+  diffid: number
+  metadata?: RawMeta
 }
 
 export interface RawCollection {
@@ -120,6 +130,24 @@ interface LinkResponse {
 }
 
 const linkUrl = (link: LinkResponse) => link.url ?? `https://${link.hosts[0]}${link.path}`
+
+/** Il numero dell'ultimo cambiamento nell'account: da lì `diffSince` racconta i successivi. */
+export async function latestDiffId(): Promise<number> {
+  return (await call<{ diffid: number }>('diff', { last: 0 })).diffid
+}
+
+/**
+ * I cambiamenti dopo `diffid`. Con `block` la richiesta resta aperta finché ne arriva uno
+ * (o scade `timeoutMs`): è così che la libreria si aggiorna da sola.
+ */
+export async function diffSince(diffid: number, block: boolean, timeoutMs: number) {
+  return call<{ diffid: number; entries: DiffEntry[] }>('diff', { diffid, block: block ? 1 : undefined, limit: 2000 }, timeoutMs)
+}
+
+/** Sposta il file nel cestino di pCloud (da lì si può recuperare). */
+export async function deleteFile(fileid: number): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('deletefile', { fileid })).metadata
+}
 
 /** L'intero albero sotto `path` in una chiamata sola (può metterci un po'). */
 export async function listTree(path: string): Promise<RawMeta> {

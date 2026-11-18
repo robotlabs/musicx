@@ -174,6 +174,21 @@ const paths = {
       <line x1="12" y1="6.5" x2="12" y2="15.5" stroke="var(--bg, #fff)" />
     </>
   ),
+  check: <polyline points="20 6 9 17 4 12" />,
+  // Schermo con il tasto play: un video.
+  video: (
+    <>
+      <rect x="2" y="4" width="20" height="16" rx="4" />
+      <polygon points="10 9 15 12 10 15 10 9" fill="currentColor" />
+    </>
+  ),
+  // Due fogli uno sopra l'altro: copie.
+  duplicates: (
+    <>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </>
+  ),
   storage: (
     <>
       <ellipse cx="12" cy="5" rx="9" ry="3" />

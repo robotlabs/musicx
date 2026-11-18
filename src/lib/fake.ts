@@ -7,7 +7,7 @@ import { readTags, writeTags } from './id3'
 import { setNamespace } from './env'
 import { setLocalSourceEnabled } from './localSource'
 import { setLoginTransport } from './passwordLogin'
-import { PCloudError, setTransport, type Params, type RawMeta } from './pcloud'
+import { PCloudError, setTransport, type DiffEntry, type Params, type RawMeta } from './pcloud'
 
 let nextFolderId = 100
 let nextFileId = 1000
@@ -15,9 +15,16 @@ const files = new Map<number, RawMeta>()
 
 type Tags = Pick<RawMeta, 'artist' | 'album' | 'title' | 'trackno'>
 
+/** Impronta finta del contenuto: uguale per nome e tag uguali (come due copie dello stesso file). */
+const fakeHash = (seed: string) => [...seed].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 2 ** 40, 7)
+
 function file(name: string, tags: Tags = {}): RawMeta {
-  return { name, isfolder: false, fileid: nextFileId++, ...tags }
+  const hash = fakeHash(`${name}|${tags.title ?? ''}|${tags.artist ?? ''}`)
+  return { name, isfolder: false, fileid: nextFileId++, hash, size: 3_000_000 + (hash % 5_000_000), ...tags }
 }
+
+/** Una copia identica di un file (stesso contenuto, altro fileid), per provare i doppioni. */
+const copyOf = (original: RawMeta, name = original.name): RawMeta => ({ ...original, name, fileid: nextFileId++ })
 
 function folder(name: string, contents: RawMeta[]): RawMeta {
   const folderid = nextFolderId++
@@ -28,15 +35,17 @@ function folder(name: string, contents: RawMeta[]): RawMeta {
   return { name, isfolder: true, folderid, contents }
 }
 
-const album = (artist: string, name: string, titles: string[]) =>
+const album = (artist: string, name: string, titles: string[], first = 1) =>
   titles.map((title, i) =>
-    file(`${String(i + 1).padStart(2, '0')}-${title.toLowerCase().replace(/\s+/g, '_')}.mp3`, { artist, album: name, title }),
+    file(`${String(i + first).padStart(2, '0')}-${title.toLowerCase().replace(/\s+/g, '_')}.mp3`, { artist, album: name, title }),
   )
+
+const parlami = file('01-parlami_di_me.mp3', { artist: 'Avion Travel', album: "L'amico magico", title: 'Parlami di me' })
 
 const tree = folder('music', [
   folder('-musica', [
     folder('--listen', [
-      folder('Avion Travel - L\'amico magico (2009)', album('Avion Travel', 'L\'amico magico', ['Parlami di me', 'La dolce vita', 'Amarcord', 'Otto e mezzo'])),
+      folder('Avion Travel - L\'amico magico (2009)', [parlami, ...album('Avion Travel', 'L\'amico magico', ['La dolce vita', 'Amarcord', 'Otto e mezzo'], 2)]),
       folder('JMI', ['01 Track 01 1.mp3', '02 Track 02 1.mp3', '10 Track 10 1.mp3', '3 Track 03 1.mp3'].map((name) => file(name))),
       folder('copertine', [file('front.jpg'), file('back.jpg')]),
     ]),
@@ -54,6 +63,8 @@ const tree = folder('music', [
   ]),
   // Vuota: l'indice non la mostra, ma ci si può spostare dentro qualcosa.
   folder('Da sistemare', []),
+  // Doppioni: una copia identica e lo stesso brano in un altro formato.
+  folder('Vecchi download', [copyOf(parlami, 'Avion Travel - Parlami di me.mp3'), file('Iyahta.flac', { artist: 'King Tubby', title: 'Iyahta' })]),
   file('sciolto nella radice.mp3'),
 ])
 
@@ -83,6 +94,41 @@ function moveInto(entry: RawMeta, target: RawMeta) {
   }
   entry.parentfolderid = target.folderid
   target.contents!.push(entry)
+}
+
+// Cronologia dei cambiamenti, come `diff` di pCloud.
+const events: DiffEntry[] = []
+let lastDiffId = 5000
+function emit(event: string, metadata: RawMeta) {
+  events.push({ event, diffid: ++lastDiffId, metadata: { ...metadata, contents: undefined } })
+}
+
+async function diff(params: Params) {
+  if (params.last !== undefined) return { result: 0, diffid: lastDiffId, entries: [] }
+  const since = Number(params.diffid)
+  // Con block si aspetta un cambiamento (al massimo 20 secondi, poi una risposta vuota).
+  for (let waited = 0; params.block && !events.some((entry) => entry.diffid > since) && waited < 20_000; waited += 300) {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+  }
+  return { result: 0, diffid: lastDiffId, entries: events.filter((entry) => entry.diffid > since) }
+}
+
+/** Solo in sviluppo: cambia qualcosa "da un altro dispositivo", per vedere la libreria aggiornarsi da sola. */
+function exposeRemote() {
+  const remote = {
+    addFile(folderName: string, name: string, tags: Tags = {}) {
+      const find = (from: RawMeta): RawMeta | null =>
+        from.name === folderName && from.isfolder ? from : (from.contents ?? []).reduce<RawMeta | null>((found, child) => found ?? (child.isfolder ? find(child) : null), null)
+      const target = find(tree)
+      if (!target) throw new Error(`Cartella finta "${folderName}" non trovata`)
+      const added = { ...file(name, tags), parentfolderid: target.folderid }
+      target.contents!.push(added)
+      files.set(added.fileid!, added)
+      emit('createfile', added)
+      return added.fileid
+    },
+  }
+  ;(window as unknown as { fakePcloud: typeof remote }).fakePcloud = remote
 }
 
 interface FakeCollection {
@@ -170,14 +216,30 @@ function downloadLink(fileid: number) {
   return { result: 0, hosts: ['fake'], path: '/', url: URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>])) }
 }
 
-async function upload(params: Params, file: { name: string; data: Blob } | undefined) {
-  const meta = [...files.values()].find((entry) => entry.parentfolderid === Number(params.folderid) && entry.name === file?.name)
-  if (!meta || !file) throw new PCloudError(2005, 'Directory does not exist.')
-  const bytes = new Uint8Array(await file.data.arrayBuffer())
+async function upload(params: Params, upload: { name: string; data: Blob } | undefined) {
+  if (!upload) throw new PCloudError(2005, 'Directory does not exist.')
+  const target = folderOf(params)
+  let meta = [...files.values()].find((entry) => entry.parentfolderid === target.folderid && entry.name === upload.name)
+  const created = !meta
+  if (!meta) {
+    // File nuovo nella cartella.
+    meta = { name: upload.name, isfolder: false, fileid: nextFileId++, parentfolderid: target.folderid }
+    target.contents!.push(meta)
+    files.set(meta.fileid!, meta)
+  }
+  const bytes = new Uint8Array(await upload.data.arrayBuffer())
   const tags = readTags(bytes)
   uploaded.set(meta.fileid!, bytes)
   // Come pCloud: rilegge subito i tag del file nuovo.
-  Object.assign(meta, { title: tags.title, artist: tags.artist, album: tags.album, trackno: tags.track ? Number.parseInt(tags.track, 10) : undefined })
+  Object.assign(meta, {
+    title: tags.title,
+    artist: tags.artist,
+    album: tags.album,
+    trackno: tags.track ? Number.parseInt(tags.track, 10) : undefined,
+    size: bytes.length,
+    hash: fakeHash(`${upload.name}|${bytes.length}`),
+  })
+  emit(created ? 'createfile' : 'modifyfile', meta)
   return { result: 0, fileids: [meta.fileid], metadata: [{ ...meta }] }
 }
 
@@ -233,6 +295,7 @@ export function installFake(trackSeconds = 6, signedIn = true) {
   setDirectLinks(true)
   setMemoryAuth(signedIn ? { token: 'fake', host: 'eapi.pcloud.com', kind: 'session' } : null)
   installFakeLogin()
+  exposeRemote()
   setTransport(async (method, params, _timeout, file) => {
     await new Promise((resolve) => setTimeout(resolve, 120))
     switch (method) {
@@ -252,6 +315,7 @@ export function installFake(trackSeconds = 6, signedIn = true) {
         if (findFolder(target.folderid!, moving)) throw new PCloudError(2043, 'Cannot move a folder to a subfolder of itself.')
         if (target.contents!.some((child) => child.name === moving.name)) throw new PCloudError(2004, 'File or folder alredy exists.')
         moveInto(moving, target)
+        emit('modifyfolder', moving)
         return { result: 0, metadata: { ...moving, contents: undefined } }
       }
       case 'createfolderifnotexists': {
@@ -260,6 +324,7 @@ export function installFake(trackSeconds = 6, signedIn = true) {
         if (!made) {
           made = { name: String(params.name), isfolder: true, folderid: nextFolderId++, parentfolderid: parent.folderid, contents: [] }
           parent.contents!.push(made)
+          emit('createfolder', made)
         }
         return { result: 0, created: true, metadata: { ...made, contents: undefined } }
       }
@@ -272,8 +337,20 @@ export function installFake(trackSeconds = 6, signedIn = true) {
         if (!meta) throw new PCloudError(2009, 'File not found.')
         if (params.toname !== undefined) meta.name = String(params.toname)
         if (params.tofolderid !== undefined) moveInto(meta, folderOf(params, 'tofolderid'))
+        emit('modifyfile', meta)
         return { result: 0, metadata: { ...meta } }
       }
+      case 'deletefile': {
+        const meta = files.get(Number(params.fileid))
+        if (!meta) throw new PCloudError(2009, 'File not found.')
+        const from = findFolder(meta.parentfolderid!)
+        if (from) from.contents = from.contents!.filter((child) => child !== meta)
+        files.delete(meta.fileid!)
+        emit('deletefile', meta)
+        return { result: 0, metadata: { ...meta, isdeleted: true } }
+      }
+      case 'diff':
+        return diff(params)
       case 'getaudiolink':
         return link(Number(params.fileid), true, trackSeconds)
       case 'collection_list':
