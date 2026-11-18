@@ -1694,3 +1694,27 @@ code.block {
     align-items: flex-start;
   }
 }
+
+/* Brani che sono già nella libreria. */
+.yt-owned {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 720px;
+  margin-bottom: 16px;
+  padding: 10px 6px 4px;
+  border: 1px solid var(--saved);
+  border-radius: var(--radius);
+}
+
+.yt-owned > strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: var(--saved);
+}
+
+.yt-panel .yt-owned {
+  margin-bottom: 0;
+}

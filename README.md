@@ -85,7 +85,9 @@ cd android && ./gradlew installDebug
   diventa un mp3 nella cartella dell'artista su pCloud (quella che c'è già, cercata per nome o per i
   tag dei brani; altrimenti una nuova in `/rob/music`), con nome `Artista - Titolo.mp3`. Artista,
   titolo, album, numero, anno e copertina arrivano dal catalogo di iTunes e si possono correggere;
-  la cartella si può cambiare. Lo fa un piccolo servizio sul Mac (`helper/youtube-helper.mjs`, solo
+  la cartella si può cambiare. Prima di YouTube cerca nella libreria: "Ce l'hai già" mostra i brani
+  che corrispondono, e prima di scaricare avvisa se lo stesso artista e titolo c'è già (il pulsante
+  diventa "Scarica lo stesso"). Lo fa un piccolo servizio sul Mac (`helper/youtube-helper.mjs`, solo
   Node, yt-dlp e ffmpeg), che la pagina trova su `127.0.0.1:8621` (o le porte successive, fino alla
   8630) e che risponde solo a musicx. I termini di YouTube non permettono di scaricare: è per uso
   personale.

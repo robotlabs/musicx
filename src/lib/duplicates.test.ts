@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findDuplicates } from './duplicates'
+import { findDuplicates, findSong } from './duplicates'
 import { buildLibrary } from './library'
 import type { RawMeta } from './pcloud'
 
@@ -43,5 +43,11 @@ describe('doppioni', () => {
 
   it('conta i brani senza impronta (indice da rileggere)', () => {
     expect(findDuplicates(library).unknown).toBe(1)
+  })
+
+  it('trova se una canzone c\'è già: titolo e artista, anche con parentesi o senza tag', () => {
+    expect(findSong(library, 'vasco rossi', 'Albachiara (Official Video)').map((track) => track.id)).toEqual([1, 3, 4])
+    expect(findSong(library, 'Vasco Rossi', 'Siamo solo noi').map((track) => track.id)).toEqual([2])
+    expect(findSong(library, 'Ligabue', 'Albachiara')).toEqual([])
   })
 })

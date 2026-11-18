@@ -2,7 +2,8 @@
 // di iTunes), e il brano finisce in mp3 nella cartella dell'artista su pCloud.
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { libraryStore, toQueueItem, type Library } from '../lib/library'
+import { findSong } from '../lib/duplicates'
+import { folderTrail, libraryStore, searchLibrary, toQueueItem, type Library, type Track } from '../lib/library'
 import type { Step } from '../lib/move'
 import { applyLocalEvents } from '../lib/liveLibrary'
 import { createFolder, listFolder, uploadFile } from '../lib/pcloud'
@@ -37,6 +38,45 @@ const clock = (seconds: number | null) =>
 type Destination = { kind: 'existing'; trail: Step[] } | { kind: 'new'; parent: Step[]; name: string }
 
 const pathText = (trail: Step[]) => trail.map((step) => step.name).join(' ▸ ')
+
+const folderPath = (library: Library, folderId: number) =>
+  folderTrail(library, folderId)
+    .map((folder) => (folder.id === library.rootId ? 'Libreria' : folder.name))
+    .join(' ▸ ')
+
+/** Brani che hai già: si sentono con un clic, e c'è la strada per la loro cartella. */
+function OwnedTracks({ library, tracks }: { library: Library; tracks: Track[] }) {
+  const play = (index: number) => playItems(tracks.map((track) => toQueueItem(library, track)), index)
+  return (
+    <ul className="rows">
+      {tracks.map((track, index) => (
+        <li className="row" key={track.id}>
+          <button type="button" className="row-main" onClick={() => play(index)}>
+            <span className="row-icon">
+              <Icon name="play" size={16} />
+            </span>
+            <span className="row-text">
+              <span className="row-title">{track.title ?? track.name}</span>
+              <span className="row-sub">
+                {track.artist ? `${track.artist} · ` : ''}
+                {folderPath(library, track.parent)}
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`Vai alla cartella di ${track.title ?? track.name}`}
+            title="Vai alla cartella"
+            onClick={() => navigate({ name: 'folder', id: track.parent })}
+          >
+            <Icon name="folder" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 function destinationFor(library: Library, artist: string): Destination {
   const existing = artistFolder(library, artist)
@@ -162,6 +202,8 @@ function Prepare({ video, query, library, onBack }: { video: Video; query: strin
     }
   }
 
+  // Ce l'hai già? Stesso artista e titolo nella libreria.
+  const owned = useMemo(() => findSong(library, info.artist, info.title), [library, info.artist, info.title])
   const fileName = `${safeName(`${info.artist} - ${info.title}`) || '…'}.mp3`
   const where =
     destination.kind === 'existing' ? pathText(destination.trail) : `${pathText(destination.parent)} ▸ ${destination.name} (nuova cartella)`
@@ -258,6 +300,15 @@ function Prepare({ video, query, library, onBack }: { video: Video; query: strin
         </label>
       </div>
 
+      {owned.length > 0 && stage.step !== 'working' && (
+        <div className="yt-owned" role="note">
+          <strong>
+            <Icon name="check" size={16} /> Ce l'hai già
+          </strong>
+          <OwnedTracks library={library} tracks={owned} />
+        </div>
+      )}
+
       <div className="yt-where">
         <Icon name="folder" size={18} />
         <span>
@@ -279,7 +330,8 @@ function Prepare({ video, query, library, onBack }: { video: Video; query: strin
 
       <div className="head-actions">
         <button className="pill primary" type="submit" disabled={working || !info.artist.trim() || !info.title.trim()}>
-          <Icon name="download" size={16} /> {stage.step === 'failed' ? 'Riprova' : 'Scarica e aggiungi'}
+          <Icon name="download" size={16} />{' '}
+          {stage.step === 'failed' ? 'Riprova' : owned.length ? 'Scarica lo stesso' : 'Scarica e aggiungi'}
         </button>
         <button className="pill" type="button" disabled={working} onClick={onBack}>
           Indietro
@@ -294,6 +346,7 @@ export function YouTubeView() {
   const [helper, setHelper] = useState<HelperInfo | null | undefined>(undefined)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Video[] | null>(null)
+  const [owned, setOwned] = useState<Track[]>([])
   const [searching, setSearching] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [video, setVideo] = useState<Video | null>(null)
@@ -309,6 +362,8 @@ export function YouTubeView() {
     setSearching(true)
     setProblem(null)
     setVideo(null)
+    // Prima la libreria: se c'è già, si vede subito senza aspettare YouTube.
+    setOwned(library ? searchLibrary(library, text, 5).tracks : [])
     try {
       setResults(await searchVideos(text))
     } catch (error) {
@@ -353,6 +408,14 @@ export function YouTubeView() {
               <Icon name="search" size={16} /> Cerca
             </button>
           </form>
+          {owned.length > 0 && (
+            <section className="yt-owned">
+              <strong>
+                <Icon name="check" size={16} /> Ce l'hai già
+              </strong>
+              <OwnedTracks library={library} tracks={owned} />
+            </section>
+          )}
           {searching && <Notice loading title="Cerco su YouTube…" />}
           {problem && <p className="login-notice">{problem}</p>}
           {!searching && results && results.length === 0 && <Notice title="Niente trovato" body="Prova con altre parole." />}
