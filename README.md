@@ -93,8 +93,11 @@ cd android && ./gradlew installDebug
   personale.
 - **Playlist**: sono le playlist native di pCloud (API `collection_*`), quindi le stesse su ogni
   dispositivo e visibili anche nell'app ufficiale di pCloud. Riordino trascinando o, dal ⋯,
-  "Ordina per numero di traccia" (album nell'ordine in cui compaiono, dentro il numero), import dei
-  vecchi `.m3u`. Sul Mac un brano o una cartella si trascina direttamente su una playlist della
+  "Ordina per numero di traccia" (album nell'ordine in cui compaiono, dentro il numero). "Importa"
+  crea una playlist da un vecchio `.m3u` o da una playlist esportata da iTunes (`.xml`): propone i
+  file che stanno nella cartella della musica su pCloud, o se ne sceglie uno dal dispositivo. I brani
+  di iTunes si ritrovano per dimensione del file, nome, percorso e infine artista e titolo
+  (`src/lib/itunes.ts`); quelli che mancano vengono detti per nome. Sul Mac un brano o una cartella si trascina direttamente su una playlist della
   barra laterale (o su "Nuova playlist").
 - **Selezione (Mac)**: come in Spotify, un clic seleziona un brano, Maiusc+clic l'intervallo,
   Cmd+clic aggiunge o toglie, Cmd+A tutti, Esc o un clic nel vuoto nessuno. Il doppio clic (o il
@@ -209,6 +212,6 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 - `android/`, `capacitor.config.ts`, `assets/` – il guscio Android e le sorgenti delle sue icone
 - `src/lib/queue.ts` – logica della coda (pura, testata)
 - `src/lib/playlists.ts` – playlist pCloud, modifiche in fila una alla volta
-- `src/lib/m3u.ts` – import dei vecchi `.m3u`
+- `src/lib/m3u.ts`, `src/lib/itunes.ts` – import dei vecchi `.m3u` e delle playlist di iTunes
 - `src/lib/fake.ts` – pCloud finto per lo sviluppo
 - `src/ui/` – interfaccia React

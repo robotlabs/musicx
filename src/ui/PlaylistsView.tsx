@@ -1,10 +1,7 @@
 import { useMemo, useRef, type ChangeEvent } from 'react'
 import { downloadsStore } from '../lib/downloads'
-import { libraryStore } from '../lib/library'
-import { matchM3u, parseM3u } from '../lib/m3u'
 import { isOpen, openGroupsStore, toggleGroup } from '../lib/openGroups'
 import {
-  addToPlaylist,
   groupPlaylists,
   playlistsStore,
   refreshPlaylists,
@@ -15,31 +12,13 @@ import { navigate, routeHref } from '../lib/router'
 import { useStore } from '../lib/store'
 import { SavedMark } from './downloadActions'
 import { Icon } from './icons'
+import { importPlaylistText, openImportMenu } from './importPlaylist'
 import { Notice } from './parts'
 import { dragPlaylist, useDropTargets } from './drag'
 import { DropZones } from './DropZones'
 import { moveToGroup, newGroupFlow, openGroupMenu, openPlaylistMenu, playlistCount } from './playlistActions'
-import { createPlaylistFlow, toast } from './sheets'
-import { errorText, tracksLabel } from './text'
-
-/** Crea una playlist dai brani di un file .m3u che si ritrovano nella libreria. */
-async function importM3u(file: File) {
-  const library = libraryStore.get().library
-  if (!library) return toast('La libreria non è ancora caricata.')
-  const references = parseM3u(await file.text())
-  const { trackIds } = matchM3u(library, references)
-  if (!trackIds.length) return toast('Nessun brano di questo file è stato trovato nella libreria.')
-
-  const id = await createPlaylistFlow(file.name.replace(/\.m3u8?$/i, ''))
-  if (id === null) return
-  try {
-    await addToPlaylist(id, trackIds)
-    toast(`Importati ${trackIds.length} brani su ${references.length}.`)
-    navigate({ name: 'playlist', id })
-  } catch (error) {
-    toast(errorText(error))
-  }
-}
+import { createPlaylistFlow } from './sheets'
+import { tracksLabel } from './text'
 
 type Targets = ReturnType<typeof useDropTargets>
 
@@ -127,10 +106,10 @@ export function PlaylistsView() {
     const id = await createPlaylistFlow()
     if (id !== null) navigate({ name: 'playlist', id })
   }
-  const onFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (file) void importM3u(file)
+    if (file) await importPlaylistText(file.name, await file.text())
   }
 
   return (
@@ -145,10 +124,10 @@ export function PlaylistsView() {
           <button className="pill" onClick={() => void newGroupFlow()}>
             <Icon name="folder" size={16} /> Nuovo gruppo
           </button>
-          <button className="pill" onClick={() => fileInput.current?.click()}>
-            <Icon name="upload" size={16} /> Importa .m3u
+          <button className="pill" onClick={() => void openImportMenu(() => fileInput.current?.click())}>
+            <Icon name="upload" size={16} /> Importa
           </button>
-          <input ref={fileInput} type="file" accept=".m3u,.m3u8,audio/x-mpegurl" hidden onChange={onFile} />
+          <input ref={fileInput} type="file" accept=".m3u,.m3u8,.xml,audio/x-mpegurl,text/xml" hidden onChange={(event) => void onFile(event)} />
         </div>
       </header>
       {loaded && groups.length === 0 && lists.length > 1 && (

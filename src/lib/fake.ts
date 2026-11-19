@@ -65,6 +65,8 @@ const tree = folder('music', [
   folder('Da sistemare', []),
   // Doppioni: una copia identica e lo stesso brano in un altro formato.
   folder('Vecchi download', [copyOf(parlami, 'Avion Travel - Parlami di me.mp3'), file('Iyahta.flac', { artist: 'King Tubby', title: 'Iyahta' })]),
+  // Una playlist esportata da iTunes (il contenuto è in `uploaded`, più sotto).
+  file('-ABSOLUTE_.xml'),
   file('sciolto nella radice.mp3'),
 ])
 
@@ -198,6 +200,27 @@ function toneUrl(fileid: number, seconds: number): string {
 
 /** File caricati con "Modifica info": li si riscarica uguali. */
 const uploaded = new Map<number, Uint8Array>()
+
+/** La playlist di iTunes finta: tre brani della libreria finta (per dimensione, nome, artista e titolo) e uno che manca. */
+function itunesPlaylist(): string {
+  const all = [...files.values()]
+  const byName = (name: string) => all.find((entry) => entry.name === name)!
+  const entry = (id: number, name: string, artist: string, size: number | null, location: string) => `
+    <key>${id}</key><dict><key>Track ID</key><integer>${id}</integer><key>Name</key><string>${name}</string>
+    <key>Artist</key><string>${artist}</string>${size === null ? '' : `<key>Size</key><integer>${size}</integer>`}
+    <key>Location</key><string>file://localhost/Users/roberto/Music/${encodeURIComponent(location)}</string></dict>`
+  const parlami = byName('01-parlami_di_me.mp3')
+  return `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Tracks</key><dict>
+    ${entry(1, 'Parlami di me', 'Avion Travel', parlami.size!, 'vecchio/parlami.mp3')}
+    ${entry(2, 'Iyahta', 'King Tubby', null, 'King Tubby/Iyahta.flac')}
+    ${entry(3, 'Mine Field', 'King Tubby', null, 'altrove/x.mp3')}
+    ${entry(4, "i bambini dell'asilo", 'Vasco Rossi', null, "i bambini dell'asilo.mp3")}
+  </dict><key>Playlists</key><array><dict><key>Name</key><string>-ABSOLUTE_</string><key>Playlist Items</key><array>
+    <dict><key>Track ID</key><integer>3</integer></dict><dict><key>Track ID</key><integer>1</integer></dict>
+    <dict><key>Track ID</key><integer>2</integer></dict><dict><key>Track ID</key><integer>4</integer></dict>
+  </array></dict></array></dict></plist>`
+}
+uploaded.set([...files.values()].find((entry) => entry.name === '-ABSOLUTE_.xml')!.fileid!, new TextEncoder().encode(itunesPlaylist()))
 
 /**
  * Per scaricare un mp3 (e riscriverne i tag) serve un mp3 vero: tag dai metadati finti più un frame
