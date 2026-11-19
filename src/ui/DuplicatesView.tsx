@@ -1,48 +1,23 @@
 // Doppioni: file identici e lo stesso brano in file diversi, con dove stanno e cosa farne.
 
 import { useMemo } from 'react'
-import { forget } from '../lib/audioStore'
 import { findDuplicates } from '../lib/duplicates'
 import { folderTrail, libraryStore, refreshLibrary, toQueueItem, type Library } from '../lib/library'
-import { applyLocalEvents } from '../lib/liveLibrary'
-import { deleteFile } from '../lib/pcloud'
+import { deleteTracks } from './actions'
 import { playItems } from './play'
 import { navigate } from '../lib/router'
 import { useStore } from '../lib/store'
 import { Icon } from './icons'
 import { Notice } from './parts'
 import { sizeLabel } from './StorageView'
-import { confirmAction, openMenu, toast } from './sheets'
-import { errorText, tracksLabel } from './text'
+import { openMenu } from './sheets'
+import { tracksLabel } from './text'
 
 const pathOf = (library: Library, folderId: number) =>
   folderTrail(library, folderId)
     .slice(1)
     .map((folder) => folder.name)
     .join(' ▸ ') || 'Libreria'
-
-/** Sposta i file nel cestino di pCloud e li toglie dall'indice e dal dispositivo. */
-async function deleteTracks(ids: number[], question: string) {
-  const sure = await confirmAction(
-    question,
-    'Vanno nel cestino di pCloud, da dove si possono recuperare. Se erano in una playlist, lì non ci sono più.',
-    'Elimina',
-  )
-  if (!sure) return
-  let done = 0
-  for (const id of ids) {
-    try {
-      await deleteFile(id)
-      applyLocalEvents([{ event: 'deletefile', diffid: 0, metadata: { name: '', isfolder: false, fileid: id } }])
-      void forget(id)
-      done += 1
-    } catch (error) {
-      toast(errorText(error))
-      return
-    }
-  }
-  toast(done === 1 ? 'Spostato nel cestino di pCloud.' : `${tracksLabel(done)} spostati nel cestino di pCloud.`)
-}
 
 function DuplicateGroup({ library, ids, identical }: { library: Library; ids: number[]; identical: boolean }) {
   const tracks = ids.flatMap((id) => library.tracks.get(id) ?? [])

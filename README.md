@@ -108,6 +108,9 @@ cd android && ./gradlew installDebug
   del brano. La voce "Preferiti" del menu principale li elenca dall'ultimo e li fa suonare (anche in
   ordine casuale). Sono una playlist di pCloud tutta loro, "★ Preferiti", che la pagina Playlist
   non mostra: così valgono su ogni dispositivo (`src/lib/starred.ts`).
+- **Elimina** (⋯ di un brano o della selezione): in una cartella sposta il file nel cestino di
+  pCloud, dopo la conferma; in una playlist chiede "Solo da questa playlist" o "Via il file da
+  pCloud" (nel cestino, e sparisce da tutte le playlist).
 - **Da dove suona**: il lettore si ricorda la pagina da cui è partita la coda (playlist, cartella,
   preferiti, ricerca); se non lo sa, vale la cartella del brano. Sul Mac il pulsante "↩ nome"
   accanto al titolo nel lettore (o un clic sul titolo) riporta lì e mette in vista il brano che

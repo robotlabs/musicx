@@ -6,7 +6,6 @@ import {
   loadPlaylist,
   movePlaylistTrack,
   playlistsStore,
-  removeFromPlaylist,
   sortPlaylistByTrackNumber,
   type PlaylistTrack,
 } from '../lib/playlists'
@@ -97,18 +96,8 @@ export function PlaylistView({ id }: { id: number }) {
       const track = tracksRef.current?.[index]
       if (!track) return
       const selected = selectedWith(index)
-      if (selected) return openTrackMenu(track, { selected: selected.map((row) => tracksRef.current![row]) })
-      openTrackMenu(track, {
-        parent: track.parent,
-        extra: [
-          {
-            label: 'Rimuovi dalla playlist',
-            icon: 'close',
-            danger: true,
-            onSelect: () => void removeFromPlaylist(id, track.id).catch((problem) => toast(errorText(problem))),
-          },
-        ],
-      })
+      if (selected) return openTrackMenu(track, { selected: selected.map((row) => tracksRef.current![row]), playlist: id })
+      openTrackMenu(track, { parent: track.parent, playlist: id })
     },
     [id, selectedWith],
   )
