@@ -5,6 +5,7 @@ import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
+import { goToSource, sourceLabel } from './play'
 import { StarButton } from './star'
 import { clock } from './text'
 
@@ -45,11 +46,15 @@ function Seek() {
 
 const repeatLabel = { off: 'Ripetizione spenta', all: 'Ripeti tutta la coda', one: 'Ripeti questo brano' }
 
+/** Come nel CSS: da 900px la barra non si apre, è sempre completa. */
+const wide = () => typeof matchMedia === 'function' && matchMedia('(min-width: 900px)').matches
+
 export function PlayerBar() {
   const player = useStore(playerStore)
   // Sul telefono la barra è compatta; toccando il titolo si apre con tutti i comandi.
   const [expanded, setExpanded] = useState(false)
   const item = player.items[player.index]
+  const source = player.source
   if (!item) return null
 
   return (
@@ -59,7 +64,13 @@ export function PlayerBar() {
         <span className="now-icon" title="Trascina su una playlist" aria-hidden="true">
           <Icon name="music" size={18} />
         </span>
-        <button className="now" onClick={() => setExpanded((open) => !open)} aria-expanded={expanded}>
+        <button
+          className={`now${source ? ' has-source' : ''}`}
+          // Su schermo largo (Mac) il titolo riporta alla playlist o cartella da cui suona; stretto apre il lettore.
+          onClick={() => (source && wide() ? goToSource() : setExpanded((open) => !open))}
+          title={source ? `Vai a ${sourceLabel(source)}` : undefined}
+          aria-expanded={expanded}
+        >
           <span className="now-title">{item.title}</span>
           <span className={`now-sub${player.error ? ' error' : ''}`}>
             {player.error ?? (player.loading && player.playing ? 'Carico…' : item.sub)}
@@ -70,7 +81,12 @@ export function PlayerBar() {
           className="icon-button now-more"
           aria-label={`Azioni per ${item.title}`}
           title="Aggiungi a playlist e altro"
-          onClick={() => openTrackMenu(item, { parent: libraryStore.get().library?.tracks.get(item.id)?.parent })}
+          onClick={() =>
+            openTrackMenu(item, {
+              parent: libraryStore.get().library?.tracks.get(item.id)?.parent,
+              extra: source ? [{ label: `Vai a ${sourceLabel(source)}`, icon: 'list', onSelect: goToSource }] : [],
+            })
+          }
         >
           <Icon name="more" size={18} />
         </button>

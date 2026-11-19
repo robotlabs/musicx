@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react'
-import { playerStore, playItems, playShuffled } from '../lib/player'
+import { playerStore } from '../lib/player'
+import { playItems, playShuffled } from './play'
 import { setGroupOpen } from '../lib/openGroups'
 import {
   loadPlaylist,

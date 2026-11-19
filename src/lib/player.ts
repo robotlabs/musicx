@@ -24,6 +24,7 @@ import {
   type QItem,
   type QueueState,
 } from './queue'
+import type { Route } from './router'
 import { createStore } from './store'
 
 export interface PlayerState extends QueueState {
@@ -31,9 +32,11 @@ export interface PlayerState extends QueueState {
   playing: boolean
   loading: boolean
   error: string | null
+  /** La pagina da cui è partita la coda (playlist, cartella, preferiti…): il lettore ci riporta. */
+  source: Route | null
 }
 
-export const playerStore = createStore<PlayerState>({ ...emptyQueue, playing: false, loading: false, error: null })
+export const playerStore = createStore<PlayerState>({ ...emptyQueue, playing: false, loading: false, error: null, source: null })
 
 /** Separato dallo stato del lettore perché cambia più volte al secondo. */
 export const progressStore = createStore({ position: 0, duration: 0 })
@@ -377,19 +380,19 @@ export function toggle() {
   else resume()
 }
 
-/** Sostituisce la coda e suona dal brano `start`. */
-export function playItems(items: QItem[], start = 0) {
+/** Sostituisce la coda e suona dal brano `start`. `source` è la pagina da cui parte. */
+export function playItems(items: QItem[], start = 0, source: Route | null = null) {
   if (!items.length) return
-  playerStore.set((state) => ({ ...state, ...replaceQueue(state, items, start), error: null }))
+  playerStore.set((state) => ({ ...state, ...replaceQueue(state, items, start), error: null, source }))
   failures = 0
   void load({ autoplay: true })
 }
 
 /** Sostituisce la coda e la suona in ordine casuale. */
-export function playShuffled(items: QItem[]) {
+export function playShuffled(items: QItem[], source: Route | null = null) {
   if (!items.length) return
   patch({ shuffle: true })
-  playItems(items, Math.floor(Math.random() * items.length))
+  playItems(items, Math.floor(Math.random() * items.length), source)
 }
 
 export function playNext(items: QItem[]) {
@@ -436,7 +439,7 @@ export function removeFromQueue(position: number) {
 }
 
 export function clearQueue() {
-  playerStore.set((state) => ({ ...state, items: [], index: -1, original: null, error: null }))
+  playerStore.set((state) => ({ ...state, items: [], index: -1, original: null, error: null, source: null }))
   unload()
 }
 
@@ -459,6 +462,7 @@ interface Saved {
   shuffle: boolean
   repeat: QueueState['repeat']
   position: number
+  source?: Route | null
 }
 
 function save() {
@@ -470,6 +474,7 @@ function save() {
     shuffle: state.shuffle,
     repeat: state.repeat,
     position: keep ? progressStore.get().position : 0,
+    source: keep ? state.source : null,
   }
   try {
     localStorage.setItem(storageKey('player'), JSON.stringify(saved))
@@ -488,7 +493,7 @@ export function initPlayer() {
     const saved = JSON.parse(localStorage.getItem(storageKey('player')) ?? 'null') as Saved | null
     if (saved && Array.isArray(saved.items)) {
       const index = saved.items.length ? Math.min(Math.max(saved.index, 0), saved.items.length - 1) : -1
-      patch({ items: saved.items, index, shuffle: !!saved.shuffle, repeat: saved.repeat ?? 'off' })
+      patch({ items: saved.items, index, shuffle: !!saved.shuffle, repeat: saved.repeat ?? 'off', source: saved.source ?? null })
       progressStore.set({ position: saved.position || 0, duration: 0 })
       const item = currentItem()
       if (item) showMetadata(item)

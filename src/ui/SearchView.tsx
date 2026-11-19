@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo } from 'react'
 import { libraryStore, searchLibrary, toQueueItem, tracksUnder } from '../lib/library'
-import { playerStore, playItems } from '../lib/player'
+import { playerStore } from '../lib/player'
+import { playItems } from './play'
 import { routeHref } from '../lib/router'
 import type { QItem } from '../lib/queue'
 import { useStore } from '../lib/store'

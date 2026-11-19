@@ -10,8 +10,9 @@ import {
   type Folder,
   type Library,
 } from '../lib/library'
-import { playerStore, playItems, playShuffled } from '../lib/player'
-import { navigate, routeHref } from '../lib/router'
+import { playerStore } from '../lib/player'
+import { playItems, playShuffled } from './play'
+import { navigate, routeHref, type Route } from '../lib/router'
 import { useStore } from '../lib/store'
 import { openTrackMenu, queueMenuItems } from './actions'
 import { DownloadToggle, folderDownloadItems, SavedMark, useDownloadedCount } from './downloadActions'
@@ -99,12 +100,14 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
     return { props: dropTarget(key, onDrop, undefined, 'move'), over: onDrop !== null && over === key }
   }
 
+  const folderRoute = (target: Folder): Route => ({ name: 'folder', id: target.id === library.rootId ? null : target.id })
+
   const openFolderMenu = (target: Folder) =>
     openMenu(
       target.name,
       [
-        { label: 'Riproduci', icon: 'play', onSelect: () => playItems(everything(target)) },
-        { label: 'Riproduci in ordine casuale', icon: 'shuffle', onSelect: () => playShuffled(everything(target)) },
+        { label: 'Riproduci', icon: 'play', onSelect: () => playItems(everything(target), 0, folderRoute(target)) },
+        { label: 'Riproduci in ordine casuale', icon: 'shuffle', onSelect: () => playShuffled(everything(target), folderRoute(target)) },
         ...queueMenuItems(everything(target)),
         ...(target.id === library.rootId
           ? []

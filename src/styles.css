@@ -867,6 +867,13 @@ button:disabled {
   flex: none;
 }
 
+/* Sul Mac il titolo riporta alla playlist o cartella da cui suona (play.ts). */
+@media (min-width: 900px) {
+  .now.has-source:hover .now-title {
+    text-decoration: underline;
+  }
+}
+
 .now-title,
 .now-sub {
   overflow: hidden;

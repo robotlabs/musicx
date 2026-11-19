@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { playerStore, playItems, playShuffled } from '../lib/player'
+import { playerStore } from '../lib/player'
+import { playItems, playShuffled } from './play'
 import { starredStore } from '../lib/starred'
 import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'

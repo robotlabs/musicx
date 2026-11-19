@@ -7,7 +7,7 @@ import { folderTrail, libraryStore, searchLibrary, toQueueItem, type Library, ty
 import type { Step } from '../lib/move'
 import { applyLocalEvents } from '../lib/liveLibrary'
 import { createFolder, listFolder, uploadFile } from '../lib/pcloud'
-import { playItems } from '../lib/player'
+import { playItems } from './play'
 import { navigate } from '../lib/router'
 import { useStore } from '../lib/store'
 import {
