@@ -222,6 +222,15 @@ function itunesPlaylist(): string {
 }
 uploaded.set([...files.values()].find((entry) => entry.name === '-ABSOLUTE_.xml')!.fileid!, new TextEncoder().encode(itunesPlaylist()))
 
+// Con ?fake&importjob c'è anche un musicx-import.json: l'app crea da sola le playlist che contiene.
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('importjob')) {
+  const ids = [...files.values()].filter((entry) => entry.name.endsWith('.mp3')).map((entry) => entry.fileid!)
+  const job: RawMeta = { ...file('musicx-import.json'), parentfolderid: tree.folderid }
+  tree.contents!.push(job)
+  files.set(job.fileid!, job)
+  uploaded.set(job.fileid!, new TextEncoder().encode(JSON.stringify({ playlists: [{ name: 'Da iTunes', files: ids.slice(0, 3) }, { name: 'Vuota', files: [999999] }] })))
+}
+
 /**
  * Per scaricare un mp3 (e riscriverne i tag) serve un mp3 vero: tag dai metadati finti più un frame
  * audio muto. Per ascoltarlo resta il WAV con la nota.

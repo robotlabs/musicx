@@ -7,8 +7,8 @@ import { libraryStore } from '../lib/library'
 import { localSourceUp, whyNoFiles } from '../lib/localSource'
 import { matchM3u, parseM3u } from '../lib/m3u'
 import { isNativeApp, nativeGetBytes } from '../lib/native'
-import { fileLink, listFolder, type RawMeta } from '../lib/pcloud'
-import { addToPlaylist } from '../lib/playlists'
+import { deleteFile, fileLink, listFolder, type RawMeta } from '../lib/pcloud'
+import { addToPlaylist, createPlaylist, playlistsStore, refreshPlaylists } from '../lib/playlists'
 import { navigate } from '../lib/router'
 import { createPlaylistFlow, openMenu, toast } from './sheets'
 import { errorText, tracksLabel } from './text'
@@ -113,4 +113,49 @@ export async function openImportMenu(fromDevice: () => void) {
     ],
     files.length ? 'Playlist di iTunes (.xml) o .m3u, dalla cartella della musica su pCloud' : 'Playlist di iTunes (.xml) o .m3u',
   )
+}
+
+/**
+ * Playlist preparate fuori dall'app (per esempio da una libreria di iTunes) da creare da sole: un file
+ * `musicx-import.json` nella cartella della musica, `{ "playlists": [{ "name": "...", "files": [fileid, ...] }] }`.
+ * All'avvio l'app lo legge, lo mette nel cestino (così un altro dispositivo non le crea due volte) e crea le
+ * playlist che non ci sono già.
+ */
+export const IMPORT_JOB_FILE = 'musicx-import.json'
+
+interface ImportJob {
+  playlists?: { name?: unknown; files?: unknown }[]
+}
+
+export async function runImportJob() {
+  const library = libraryStore.get().library
+  if (!library) return
+  let job: RawMeta | undefined
+  let data: ImportJob
+  try {
+    job = (await listFolder(library.rootId)).contents?.find((entry) => !entry.isfolder && entry.name === IMPORT_JOB_FILE)
+    if (!job?.fileid) return
+    data = JSON.parse(await readMusicFile(job)) as ImportJob
+    await deleteFile(job.fileid)
+  } catch {
+    // Senza rete, file illeggibile o già preso da un altro dispositivo: si riprova al prossimo avvio.
+    return
+  }
+  try {
+    await refreshPlaylists()
+    const existing = new Set(playlistsStore.get().lists.map((list) => list.name))
+    let made = 0
+    for (const list of data.playlists ?? []) {
+      const name = typeof list.name === 'string' ? list.name.trim() : ''
+      const files = Array.isArray(list.files) ? list.files.filter((id): id is number => typeof id === 'number' && library.tracks.has(id)) : []
+      if (!name || !files.length || existing.has(name)) continue
+      const id = await createPlaylist(name)
+      await addToPlaylist(id, files)
+      existing.add(name)
+      made += 1
+    }
+    if (made) toast(made === 1 ? 'Creata 1 playlist importata.' : `Create ${made} playlist importate.`)
+  } catch (error) {
+    toast(errorText(error))
+  }
 }

@@ -10,6 +10,7 @@ import { isOpen, loadOpenGroups, openGroupsStore, setGroupOpen, toggleGroup } fr
 import { ANDROID_APP_URL, isAndroidBrowser } from '../lib/native'
 import { accountEmail, endSession } from '../lib/pcloud'
 import { initPlayer, playerStore, resetPlayer, toggle } from '../lib/player'
+import { runImportJob } from './importPlaylist'
 import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, restorePlaylists, type Playlist } from '../lib/playlists'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
 import { useStore } from '../lib/store'
@@ -310,7 +311,7 @@ export function Main() {
     loadOpenGroups()
     initPlayer()
     restorePlaylists()
-    void initLibrary()
+    void initLibrary().then(() => runImportJob())
     startLiveLibrary()
     void refreshPlaylists()
     void initAudioStore().then(initDownloads)

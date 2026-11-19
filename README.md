@@ -97,7 +97,11 @@ cd android && ./gradlew installDebug
   crea una playlist da un vecchio `.m3u` o da una playlist esportata da iTunes (`.xml`): propone i
   file che stanno nella cartella della musica su pCloud, o se ne sceglie uno dal dispositivo. I brani
   di iTunes si ritrovano per dimensione del file, nome, percorso e infine artista e titolo
-  (`src/lib/itunes.ts`); quelli che mancano vengono detti per nome. Sul Mac un brano o una cartella si trascina direttamente su una playlist della
+  (`src/lib/itunes.ts`); quelli che mancano vengono detti per nome. Playlist preparate fuori
+  dall'app si mettono in un `musicx-import.json` nella cartella della musica
+  (`{"playlists":[{"name":"…","files":[fileid,…]}]}`): all'avvio l'app lo sposta nel cestino e crea
+  quelle che non ci sono già, coi soli brani che esistono (`runImportJob` in
+  `src/ui/importPlaylist.ts`). Sul Mac un brano o una cartella si trascina direttamente su una playlist della
   barra laterale (o su "Nuova playlist").
 - **Selezione (Mac)**: come in Spotify, un clic seleziona un brano, Maiusc+clic l'intervallo,
   Cmd+clic aggiunge o toglie, Cmd+A tutti, Esc o un clic nel vuoto nessuno. Il doppio clic (o il
