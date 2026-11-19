@@ -11,6 +11,7 @@ import { libraryStore, stripExtension, trackNumber } from './library'
 import { collections, type RawCollection, type RawMeta } from './pcloud'
 import type { QItem } from './queue'
 import { createStore } from './store'
+import { STARRED_NAME, syncStarred } from './starred'
 
 export interface Playlist {
   id: number
@@ -100,7 +101,9 @@ const message = (error: unknown) => (error instanceof Error ? error.message : 'E
 export async function refreshPlaylists() {
   try {
     const raw = await collections.list()
-    const lists = byTitle(raw.filter((collection) => !collection.system).map(toPlaylist))
+    // I preferiti (★) hanno la loro pagina: qui non si mostrano.
+    void syncStarred(raw).catch(() => {})
+    const lists = byTitle(raw.filter((collection) => !collection.system && collection.name !== STARRED_NAME).map(toPlaylist))
     playlistsStore.set((state) => ({ ...state, lists, loaded: true, error: null }))
   } catch (error) {
     // Senza rete restano quelle salvate sul dispositivo.

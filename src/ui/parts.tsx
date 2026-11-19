@@ -8,6 +8,7 @@ import { useStore } from '../lib/store'
 import { SavedMark } from './downloadActions'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
+import { StarButton } from './star'
 
 /** Le tre barrette che segnano il brano in riproduzione (animate solo mentre suona). */
 export function Bars({ moving }: { moving: boolean }) {
@@ -87,6 +88,7 @@ export function TrackRow(props: {
           )}
         </span>
       </button>
+      <StarButton item={item} />
       <button className="icon-button" aria-label={`Azioni per ${item.title}`} onClick={props.onMenu}>
         <Icon name="more" />
       </button>

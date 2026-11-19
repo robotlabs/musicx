@@ -11,6 +11,7 @@ export type Route =
   | { name: 'storage' }
   | { name: 'duplicates' }
   | { name: 'youtube' }
+  | { name: 'starred' }
 
 export function parseRoute(hash: string): Route {
   const [head, ...rest] = hash.replace(/^#\/?/, '').split('/')
@@ -29,6 +30,7 @@ export function parseRoute(hash: string): Route {
   if (head === 'storage') return { name: 'storage' }
   if (head === 'duplicates') return { name: 'duplicates' }
   if (head === 'youtube') return { name: 'youtube' }
+  if (head === 'starred') return { name: 'starred' }
   return { name: 'folder', id: null }
 }
 
@@ -50,6 +52,8 @@ export function routeHref(route: Route): string {
       return '#/duplicates'
     case 'youtube':
       return '#/youtube'
+    case 'starred':
+      return '#/starred'
   }
 }
 

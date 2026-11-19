@@ -657,6 +657,34 @@ button:disabled {
   color: var(--on-accent);
 }
 
+/* Stella dei preferiti (star.tsx). Sul telefono nella riga si vede solo quando c'è (si mette dal ⋯);
+   col mouse compare passando sulla riga, e piena resta sempre. */
+.row .star-button {
+  display: none;
+}
+
+.row .star-button.on {
+  display: grid;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row .star-button {
+    display: grid;
+    visibility: hidden;
+  }
+
+  .row:hover .star-button,
+  .row .star-button.on,
+  .row .star-button:focus-visible {
+    visibility: visible;
+  }
+}
+
+.star-button.on,
+.star-button.on:hover {
+  color: var(--accent);
+}
+
 .row-text {
   min-width: 0;
   display: flex;
@@ -834,7 +862,8 @@ button:disabled {
   text-align: left;
 }
 
-.now-more {
+.now-more,
+.now-star {
   flex: none;
 }
 
@@ -953,6 +982,11 @@ button:disabled {
   .player.expanded .now-more {
     position: absolute;
     right: 0;
+  }
+
+  .player.expanded .now-star {
+    position: absolute;
+    left: 0;
   }
 
   .player.expanded .now-title {

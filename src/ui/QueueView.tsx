@@ -5,6 +5,7 @@ import { Icon } from './icons'
 import { Notice, TrackRow } from './parts'
 import { useSelection } from './selection'
 import { openMenu } from './sheets'
+import { starMenuItem } from './star'
 import { tracksLabel } from './text'
 
 /** Con code enormi (tutta la libreria) si disegna solo una finestra attorno al brano corrente. */
@@ -61,6 +62,7 @@ export function QueueView() {
                   : openMenu(
                   item.title,
                   [
+                    starMenuItem(item),
                     { label: 'Aggiungi a playlist…', icon: 'plus', onSelect: () => void addToPlaylistFlow([item.id]) },
                     { label: 'Togli dalla coda', icon: 'close', danger: true, onSelect: () => removeFromQueue(position) },
                   ],

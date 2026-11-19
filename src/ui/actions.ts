@@ -6,6 +6,7 @@ import { addToPlaylist, playlistsStore } from '../lib/playlists'
 import type { QItem } from '../lib/queue'
 import { navigate } from '../lib/router'
 import { trackDownloadItems } from './downloadActions'
+import { starMenuItem } from './star'
 import { editTracksInfo } from './editInfo'
 import { moveTracksFlow } from './moveTo'
 import { choosePlaylist, openMenu, toast, type MenuItem } from './sheets'
@@ -61,7 +62,7 @@ export function openTrackMenu(item: QItem, options: { parent?: number | null; ex
     openMenu(`${tracksLabel(selected.length)} selezionati`, [...queueMenuItems(selected), ...trackDownloadItems(selected), ...editItem(ids)])
     return
   }
-  const items = queueMenuItems([item])
+  const items = [starMenuItem(item), ...queueMenuItems([item])]
   const parent = options.parent
   if (parent != null && libraryStore.get().library?.folders.has(parent)) {
     items.push({ label: 'Vai alla cartella', icon: 'folder', onSelect: () => navigate({ name: 'folder', id: parent }) })

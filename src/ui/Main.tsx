@@ -11,6 +11,8 @@ import { ANDROID_APP_URL, isAndroidBrowser } from '../lib/native'
 import { accountEmail, endSession } from '../lib/pcloud'
 import { initPlayer, playerStore, resetPlayer, toggle } from '../lib/player'
 import { runImportJob } from './importPlaylist'
+import { StarredView } from './StarredView'
+import { resetStarred, restoreStarred } from '../lib/starred'
 import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, restorePlaylists, type Playlist } from '../lib/playlists'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
 import { useStore } from '../lib/store'
@@ -40,6 +42,7 @@ async function logout() {
   stopLiveLibrary()
   resetPlayer()
   resetPlaylists()
+  resetStarred()
   await forgetSavedMusic()
   await clearLibrary()
   await endSession()
@@ -138,6 +141,7 @@ function SearchBox({ route }: { route: Route }) {
 const sections: { route: Route; label: string; icon: IconName; match: Route['name'][] }[] = [
   { route: { name: 'folder', id: null }, label: 'Libreria', icon: 'music', match: ['folder', 'search'] },
   { route: { name: 'playlists' }, label: 'Playlist', icon: 'list', match: ['playlists', 'playlist'] },
+  { route: { name: 'starred' }, label: 'Preferiti', icon: 'star', match: ['starred'] },
   { route: { name: 'queue' }, label: 'Coda', icon: 'queue', match: ['queue'] },
   // Solo sul Mac, dove c'è il servizio che scarica da YouTube.
   ...(youtubeHere() ? [{ route: { name: 'youtube' } as Route, label: 'Da YouTube', icon: 'video' as IconName, match: ['youtube'] as Route['name'][] }] : []),
@@ -311,6 +315,7 @@ export function Main() {
     loadOpenGroups()
     initPlayer()
     restorePlaylists()
+    restoreStarred()
     void initLibrary().then(() => runImportJob())
     startLiveLibrary()
     void refreshPlaylists()
@@ -356,6 +361,7 @@ export function Main() {
         {route.name === 'storage' && <StorageView />}
         {route.name === 'duplicates' && <DuplicatesView />}
         {route.name === 'youtube' && <YouTubeView />}
+        {route.name === 'starred' && <StarredView />}
       </main>
       <PlayerBar />
       <Tabs route={route} />

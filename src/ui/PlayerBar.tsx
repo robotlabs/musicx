@@ -5,6 +5,7 @@ import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
+import { StarButton } from './star'
 import { clock } from './text'
 
 /** Barra di avanzamento. Mentre la si trascina mostra il valore scelto e salta solo al rilascio. */
@@ -64,6 +65,7 @@ export function PlayerBar() {
             {player.error ?? (player.loading && player.playing ? 'Carico…' : item.sub)}
           </span>
         </button>
+        <StarButton item={item} className="now-star" />
         <button
           className="icon-button now-more"
           aria-label={`Azioni per ${item.title}`}

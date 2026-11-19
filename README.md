@@ -103,6 +103,11 @@ cd android && ./gradlew installDebug
   quelle che non ci sono già, coi soli brani che esistono (`runImportJob` in
   `src/ui/importPlaylist.ts`). Sul Mac un brano o una cartella si trascina direttamente su una playlist della
   barra laterale (o su "Nuova playlist").
+- **Preferiti (★)**: sul Mac la stella sta nella riga del brano (compare passandoci sopra; piena
+  resta sempre) e nel lettore: un clic la mette, un altro la toglie. Sul telefono si mette dal ⋯
+  del brano. La voce "Preferiti" del menu principale li elenca dall'ultimo e li fa suonare (anche in
+  ordine casuale). Sono una playlist di pCloud tutta loro, "★ Preferiti", che la pagina Playlist
+  non mostra: così valgono su ogni dispositivo (`src/lib/starred.ts`).
 - **Selezione (Mac)**: come in Spotify, un clic seleziona un brano, Maiusc+clic l'intervallo,
   Cmd+clic aggiunge o toglie, Cmd+A tutti, Esc o un clic nel vuoto nessuno. Il doppio clic (o il
   ▶ che compare sull'icona) fa partire il brano. Trascinando un brano selezionato si porta dietro
@@ -217,5 +222,6 @@ Ogni push su `main` pubblica `dist/` su GitHub Pages tramite `.github/workflows/
 - `src/lib/queue.ts` – logica della coda (pura, testata)
 - `src/lib/playlists.ts` – playlist pCloud, modifiche in fila una alla volta
 - `src/lib/m3u.ts`, `src/lib/itunes.ts` – import dei vecchi `.m3u` e delle playlist di iTunes
+- `src/lib/starred.ts`, `src/ui/star.tsx`, `src/ui/StarredView.tsx` – preferiti
 - `src/lib/fake.ts` – pCloud finto per lo sviluppo
 - `src/ui/` – interfaccia React
