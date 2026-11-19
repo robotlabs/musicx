@@ -1,7 +1,7 @@
 // Far partire la musica da una pagina: il lettore si ricorda quale (per tornarci dal lettore).
 
 import { libraryStore } from '../lib/library'
-import { playerStore, playItems as playQueue, playShuffled as playQueueShuffled } from '../lib/player'
+import { playerStore, playItems as playQueue, playShuffled as playQueueShuffled, type PlayerState } from '../lib/player'
 import { playlistsStore } from '../lib/playlists'
 import type { QItem } from '../lib/queue'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
@@ -41,9 +41,22 @@ export function sourceLabel(source: Route): string {
   }
 }
 
+/**
+ * Dove riporta il lettore: la pagina da cui è partita la coda; se non si sa (coda partita prima di
+ * questa versione, o da un'altra parte) la cartella del brano che suona.
+ */
+export function sourceOf(state: PlayerState): Route | null {
+  if (state.source) return state.source
+  const item = state.items[state.index]
+  const library = libraryStore.get().library
+  const parent = item ? library?.tracks.get(item.id)?.parent : undefined
+  if (parent === undefined || !library) return null
+  return { name: 'folder', id: parent === library.rootId ? null : parent }
+}
+
 /** Va alla pagina da cui suona la coda e porta in vista il brano che suona. */
 export function goToSource() {
-  const source = playerStore.get().source
+  const source = sourceOf(playerStore.get())
   if (!source) return
   navigate(source)
   revealPlaying(routeHref(source))

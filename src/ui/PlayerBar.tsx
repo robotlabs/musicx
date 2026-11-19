@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { cycleRepeat, next, playerStore, previous, progressStore, seek, toggle, toggleShuffle } from '../lib/player'
 import { libraryStore } from '../lib/library'
+import { playlistsStore } from '../lib/playlists'
 import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
-import { goToSource, sourceLabel } from './play'
+import { goToSource, sourceLabel, sourceOf } from './play'
 import { StarButton } from './star'
 import { clock } from './text'
 
@@ -54,7 +55,10 @@ export function PlayerBar() {
   // Sul telefono la barra è compatta; toccando il titolo si apre con tutti i comandi.
   const [expanded, setExpanded] = useState(false)
   const item = player.items[player.index]
-  const source = player.source
+  // Il nome di cartelle e playlist arriva con la libreria e le playlist: quando cambiano si ridisegna.
+  useStore(libraryStore, (state) => state.library)
+  useStore(playlistsStore, (state) => state.lists)
+  const source = sourceOf(player)
   if (!item) return null
 
   return (
@@ -68,7 +72,7 @@ export function PlayerBar() {
           className={`now${source ? ' has-source' : ''}`}
           // Su schermo largo (Mac) il titolo riporta alla playlist o cartella da cui suona; stretto apre il lettore.
           onClick={() => (source && wide() ? goToSource() : setExpanded((open) => !open))}
-          title={source ? `Vai a ${sourceLabel(source)}` : undefined}
+          title={source && wide() ? `Torna a ${sourceLabel(source)}` : undefined}
           aria-expanded={expanded}
         >
           <span className="now-title">{item.title}</span>
@@ -76,6 +80,13 @@ export function PlayerBar() {
             {player.error ?? (player.loading && player.playing ? 'Carico…' : item.sub)}
           </span>
         </button>
+        {source && (
+          // Sul Mac: "↩ Battiato" riporta alla playlist o cartella che suona (sul telefono è nel ⋯).
+          <button className="now-back" title={`Torna a ${sourceLabel(source)}`} onClick={goToSource}>
+            <Icon name="back" size={14} />
+            <span>{sourceLabel(source)}</span>
+          </button>
+        )}
         <StarButton item={item} className="now-star" />
         <button
           className="icon-button now-more"
@@ -84,7 +95,7 @@ export function PlayerBar() {
           onClick={() =>
             openTrackMenu(item, {
               parent: libraryStore.get().library?.tracks.get(item.id)?.parent,
-              extra: source ? [{ label: `Vai a ${sourceLabel(source)}`, icon: 'list', onSelect: goToSource }] : [],
+              extra: source ? [{ label: `Torna a ${sourceLabel(source)}`, icon: 'back', onSelect: goToSource }] : [],
             })
           }
         >

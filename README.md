@@ -109,8 +109,9 @@ cd android && ./gradlew installDebug
   ordine casuale). Sono una playlist di pCloud tutta loro, "★ Preferiti", che la pagina Playlist
   non mostra: così valgono su ogni dispositivo (`src/lib/starred.ts`).
 - **Da dove suona**: il lettore si ricorda la pagina da cui è partita la coda (playlist, cartella,
-  preferiti, ricerca). Sul Mac un clic sul titolo del brano nel lettore riporta lì e mette in vista
-  il brano che suona; sul telefono c'è "Vai a …" nel ⋯ del lettore (`src/ui/play.ts`).
+  preferiti, ricerca); se non lo sa, vale la cartella del brano. Sul Mac il pulsante "↩ nome"
+  accanto al titolo nel lettore (o un clic sul titolo) riporta lì e mette in vista il brano che
+  suona; sul telefono c'è "Torna a …" nel ⋯ del lettore (`src/ui/play.ts`).
 - **Selezione (Mac)**: come in Spotify, un clic seleziona un brano, Maiusc+clic l'intervallo,
   Cmd+clic aggiunge o toglie, Cmd+A tutti, Esc o un clic nel vuoto nessuno. Il doppio clic (o il
   ▶ che compare sull'icona) fa partire il brano. Trascinando un brano selezionato si porta dietro

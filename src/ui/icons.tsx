@@ -175,6 +175,13 @@ const paths = {
     </>
   ),
   check: <polyline points="20 6 9 17 4 12" />,
+  // Freccia che torna indietro: alla playlist o cartella che suona.
+  back: (
+    <>
+      <polyline points="9 14 4 9 9 4" />
+      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+    </>
+  ),
   // Preferiti: vuota da mettere, piena quando c'è.
   star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />,
   starred: (
