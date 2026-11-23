@@ -1793,3 +1793,18 @@ code.block {
 .yt-panel .yt-owned {
   margin-bottom: 0;
 }
+
+/* "Da cercare" dentro "Da YouTube" (sul Mac): le canzoni scritte anche dal telefono. */
+.wish-section {
+  max-width: 720px;
+  margin-bottom: 20px;
+}
+
+.wish-section h2 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+
+.wish-section .dim {
+  margin: 0 0 6px;
+}

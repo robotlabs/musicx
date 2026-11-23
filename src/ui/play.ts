@@ -26,6 +26,8 @@ export function sourceLabel(source: Route): string {
     }
     case 'starred':
       return 'Preferiti'
+    case 'wishlist':
+      return 'Da cercare'
     case 'search':
       return source.query ? `ricerca "${source.query}"` : 'Cerca'
     case 'queue':

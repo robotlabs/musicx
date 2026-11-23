@@ -1,13 +1,12 @@
 // "Importa" nella pagina Playlist: un .m3u o una playlist esportata da iTunes (.xml), scelta tra i
 // file che stanno nella cartella della musica su pCloud o da un file del dispositivo.
 
-import { LOCAL_SOURCE } from '../config'
 import { matchItunes, parseItunes, type ItunesPlaylist } from '../lib/itunes'
 import { libraryStore } from '../lib/library'
-import { localSourceUp, whyNoFiles } from '../lib/localSource'
 import { matchM3u, parseM3u } from '../lib/m3u'
-import { isNativeApp, nativeGetBytes } from '../lib/native'
-import { deleteFile, fileLink, listFolder, type RawMeta } from '../lib/pcloud'
+import { isNativeApp } from '../lib/native'
+import { deleteFile, listFolder, type RawMeta } from '../lib/pcloud'
+import { readMusicFile } from '../lib/textFile'
 import { addToPlaylist, createPlaylist, playlistsStore, refreshPlaylists } from '../lib/playlists'
 import { navigate } from '../lib/router'
 import { createPlaylistFlow, openMenu, toast } from './sheets'
@@ -64,24 +63,6 @@ export async function importPlaylistText(fileName: string, text: string) {
   } catch (error) {
     toast(errorText(error))
   }
-}
-
-/** Il testo di un file che sta nella cartella della musica (sul Mac da rclone, nell'app dal lato nativo). */
-async function readMusicFile(file: RawMeta): Promise<string> {
-  if (isNativeApp) return new TextDecoder().decode(await nativeGetBytes(await fileLink(file.fileid!, true), 60_000))
-  if (await localSourceUp()) {
-    const response = await fetch(`${LOCAL_SOURCE}/${encodeURIComponent(file.name)}`)
-    if (!response.ok) throw new Error(`Il file non si legge (${response.status}).`)
-    return response.text()
-  }
-  // Altrove pCloud di solito non dà il link a una pagina web (sì nella modalità finta di sviluppo).
-  try {
-    const response = await fetch(await fileLink(file.fileid!, true))
-    if (response.ok) return await response.text()
-  } catch {
-    // Si spiega sotto perché non si può.
-  }
-  throw new Error(await whyNoFiles())
 }
 
 /** Menu "Importa": i file di playlist nella cartella della musica, poi "da un file". */

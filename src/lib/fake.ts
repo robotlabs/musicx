@@ -372,6 +372,14 @@ export function installFake(trackSeconds = 6, signedIn = true) {
         emit('modifyfile', meta)
         return { result: 0, metadata: { ...meta } }
       }
+      case 'deletefolder': {
+        const gone = folderOf(params)
+        if (gone.contents!.length) throw new PCloudError(2006, 'Folder is not empty.')
+        const from = findFolder(gone.parentfolderid!)
+        if (from) from.contents = from.contents!.filter((child) => child !== gone)
+        emit('deletefolder', gone)
+        return { result: 0, metadata: { ...gone, contents: undefined, isdeleted: true } }
+      }
       case 'deletefile': {
         const meta = files.get(Number(params.fileid))
         if (!meta) throw new PCloudError(2009, 'File not found.')

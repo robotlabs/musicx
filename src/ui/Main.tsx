@@ -11,7 +11,9 @@ import { ANDROID_APP_URL, isAndroidBrowser } from '../lib/native'
 import { accountEmail, endSession } from '../lib/pcloud'
 import { initPlayer, playerStore, resetPlayer, toggle } from '../lib/player'
 import { runImportJob } from './importPlaylist'
+import { startBackButton } from './back'
 import { StarredView } from './StarredView'
+import { WishlistView } from './WishlistView'
 import { resetStarred, restoreStarred } from '../lib/starred'
 import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, restorePlaylists, type Playlist } from '../lib/playlists'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
@@ -144,7 +146,10 @@ const sections: { route: Route; label: string; icon: IconName; match: Route['nam
   { route: { name: 'starred' }, label: 'Preferiti', icon: 'star', match: ['starred'] },
   { route: { name: 'queue' }, label: 'Coda', icon: 'queue', match: ['queue'] },
   // Solo sul Mac, dove c'è il servizio che scarica da YouTube.
-  ...(youtubeHere() ? [{ route: { name: 'youtube' } as Route, label: 'Da YouTube', icon: 'video' as IconName, match: ['youtube'] as Route['name'][] }] : []),
+  ...(youtubeHere()
+    ? [{ route: { name: 'youtube' } as Route, label: 'Da YouTube', icon: 'video' as IconName, match: ['youtube'] as Route['name'][] }]
+    : // Altrove (telefono) si scrivono le canzoni da cercare: sul Mac stanno in "Da YouTube".
+      [{ route: { name: 'wishlist' } as Route, label: 'Da cercare', icon: 'video' as IconName, match: ['wishlist'] as Route['name'][] }]),
 ]
 
 function SidePlaylists({ route }: { route: Route }) {
@@ -313,6 +318,7 @@ export function Main() {
 
   useEffect(() => {
     loadOpenGroups()
+    startBackButton()
     initPlayer()
     restorePlaylists()
     restoreStarred()
@@ -362,6 +368,7 @@ export function Main() {
         {route.name === 'duplicates' && <DuplicatesView />}
         {route.name === 'youtube' && <YouTubeView />}
         {route.name === 'starred' && <StarredView />}
+        {route.name === 'wishlist' && <WishlistView />}
       </main>
       <PlayerBar />
       <Tabs route={route} />

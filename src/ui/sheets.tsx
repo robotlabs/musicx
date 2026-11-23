@@ -29,7 +29,8 @@ export function closeSheet() {
   sheetStore.set(null)
 }
 
-function dismissSheet() {
+/** Chiude il pannello come col clic fuori (chi aspettava una risposta riceve "annullato"). */
+export function dismissSheet() {
   const sheet = sheetStore.get()
   sheetStore.set(null)
   sheet?.onDismiss?.()

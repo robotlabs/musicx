@@ -7,6 +7,7 @@ import { folderTrail, libraryStore, searchLibrary, toQueueItem, type Library, ty
 import type { Step } from '../lib/move'
 import { applyLocalEvents } from '../lib/liveLibrary'
 import { createFolder, listFolder, uploadFile } from '../lib/pcloud'
+import { removeWish, wishStore, type Wish } from '../lib/wishlist'
 import { playItems } from './play'
 import { navigate } from '../lib/router'
 import { useStore } from '../lib/store'
@@ -27,6 +28,7 @@ import {
   type Video,
 } from '../lib/youtube'
 import { Icon } from './icons'
+import { WishList, useWishes } from './WishlistView'
 import { chooseFolder, stepsTo } from './moveTo'
 import { Notice } from './parts'
 import { errorText } from './text'
@@ -130,7 +132,8 @@ async function upload(jobId: string, info: SongInfo, destination: Destination) {
   return { fileId: meta.fileid!, folderId, name, where }
 }
 
-function Prepare({ video, query, library, onBack }: { video: Video; query: string; library: Library; onBack: () => void }) {
+function Prepare(props: { video: Video; query: string; library: Library; onBack: () => void; onDone?: () => void }) {
+  const { video, query, library, onBack } = props
   const guess = useMemo(() => guessFromTitle(video.title, video.channel), [video])
   const [info, setInfo] = useState<SongInfo>({ artist: guess.artist, title: guess.title })
   const [matches, setMatches] = useState<SongInfo[] | null>(null)
@@ -196,6 +199,8 @@ function Prepare({ video, query, library, onBack }: { video: Video; query: strin
       if (job.state === 'error') throw new Error(job.error ?? 'Download non riuscito.')
       setStage({ step: 'working', job, uploading: true })
       const result = await upload(id, info, destination)
+      // Scaricato: se veniva dalla lista "Da cercare" la voce si toglie (anche se si è già cambiata pagina).
+      props.onDone?.()
       if (alive.current) setStage({ step: 'done', ...result })
     } catch (error) {
       if (alive.current) setStage({ step: 'failed', message: errorText(error) })
@@ -341,6 +346,19 @@ function Prepare({ video, query, library, onBack }: { video: Video; query: strin
   )
 }
 
+/** Le canzoni scritte (anche dal telefono) in "Da cercare": un clic e parte la ricerca. */
+function WishSection({ onPick }: { onPick: (wish: Wish) => void }) {
+  const count = useStore(wishStore, (state) => state.items.length)
+  if (!count) return null
+  return (
+    <section className="wish-section">
+      <h2>Da cercare</h2>
+      <p className="dim">Scritte dal telefono o da qui: un clic e la cerco su YouTube. Scaricata, si toglie dalla lista.</p>
+      <WishList onPick={onPick} />
+    </section>
+  )
+}
+
 export function YouTubeView() {
   const library = useStore(libraryStore, (state) => state.library)
   const [helper, setHelper] = useState<HelperInfo | null | undefined>(undefined)
@@ -355,9 +373,22 @@ export function YouTubeView() {
     void findHelper().then(setHelper)
   }, [])
 
+  // La voce di "Da cercare" da cui è partita la ricerca: a download finito si toglie dalla lista.
+  const [wish, setWish] = useState<Wish | null>(null)
+  useWishes()
+
+  function pickWish(picked: Wish) {
+    setWish(picked)
+    setQuery(picked.text)
+    void runSearch(picked.text)
+  }
+
   async function search(event: FormEvent) {
     event.preventDefault()
-    const text = query.trim()
+    await runSearch(query.trim())
+  }
+
+  async function runSearch(text: string) {
     if (!text) return
     setSearching(true)
     setProblem(null)
@@ -392,7 +423,14 @@ export function YouTubeView() {
         <p className="dim">Scrivi il titolo: il brano finisce in mp3 nella cartella dell'artista, con titolo e copertina giusti.</p>
       </header>
       {video ? (
-        <Prepare key={video.id} video={video} query={query} library={library} onBack={() => setVideo(null)} />
+        <Prepare
+          key={video.id}
+          video={video}
+          query={query}
+          library={library}
+          onBack={() => setVideo(null)}
+          onDone={wish ? () => void removeWish(wish.id).catch(() => {}) : undefined}
+        />
       ) : (
         <>
           <form className="yt-search" onSubmit={(event) => void search(event)}>
@@ -408,6 +446,7 @@ export function YouTubeView() {
               <Icon name="search" size={16} /> Cerca
             </button>
           </form>
+          {!results && !searching && <WishSection onPick={pickWish} />}
           {owned.length > 0 && (
             <section className="yt-owned">
               <strong>

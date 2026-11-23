@@ -89,6 +89,8 @@ export async function call<T>(method: string, params: Params = {}, timeoutMs = 3
 
 /** Metadati di file e cartelle come li manda pCloud (solo i campi che usiamo). */
 export interface RawMeta {
+  /** Data di creazione (RFC 2822), come la dà pCloud. */
+  created?: string
   name: string
   isfolder: boolean
   folderid?: number
@@ -173,10 +175,10 @@ export async function audioLink(fileid: number, kbps = 256): Promise<string> {
  * stesso fileid (quindi resta nelle playlist) e pCloud conserva la versione vecchia tra le revisioni.
  * pCloud rilegge subito i tag: i metadati restituiti hanno già titolo, artista e album nuovi.
  */
-export async function uploadFile(folderid: number, name: string, data: Uint8Array): Promise<RawMeta> {
+export async function uploadFile(folderid: number, name: string, data: Uint8Array, type = 'audio/mpeg'): Promise<RawMeta> {
   const reply = await call<{ metadata: RawMeta[] }>('uploadfile', { folderid, nopartial: 1 }, 300_000, {
     name,
-    data: new Blob([data as Uint8Array<ArrayBuffer>], { type: 'audio/mpeg' }),
+    data: new Blob([data as Uint8Array<ArrayBuffer>], { type }),
   })
   return reply.metadata[0]
 }
@@ -206,6 +208,11 @@ export async function moveFile(fileid: number, tofolderid: number): Promise<RawM
 /** Sposta una cartella con tutto quello che contiene (se là ce n'è già una con quel nome pCloud dice di no). */
 export async function moveFolder(folderid: number, tofolderid: number): Promise<RawMeta> {
   return (await call<{ metadata: RawMeta }>('renamefolder', { folderid, tofolderid })).metadata
+}
+
+/** Manda nel cestino una cartella vuota. */
+export async function deleteFolder(folderid: number): Promise<void> {
+  await call('deletefolder', { folderid })
 }
 
 /** Crea una cartella; se ce n'è già una con quel nome restituisce quella. */

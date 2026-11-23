@@ -33,6 +33,10 @@ accesso, coda e libreria restano. L'APK va rifatto solo quando cambia la parte n
 `MUSICX_KEYSTORE_*`; l'originale è sul Mac in `~/.config/musicx/android/`) e lo mette in una
 release. Senza quella chiave un APK nuovo non si installa sopra il vecchio.
 
+Il tasto indietro di Android chiude il menu o il lettore aperto, poi torna alla pagina di prima;
+sulla prima pagina manda l'app in secondo piano (la musica continua) invece di chiuderla
+(`src/ui/back.ts`, plugin `@capacitor/app`: c'è dall'APK che l'ha aggiunto in poi).
+
 Per provarla nell'emulatore contro il server di sviluppo:
 
 ```bash
@@ -103,6 +107,10 @@ cd android && ./gradlew installDebug
   quelle che non ci sono già, coi soli brani che esistono (`runImportJob` in
   `src/ui/importPlaylist.ts`). Sul Mac un brano o una cartella si trascina direttamente su una playlist della
   barra laterale (o su "Nuova playlist").
+- **Da cercare**: sul telefono si scrivono le canzoni da prendere da YouTube; sul Mac stanno in
+  "Da YouTube" e un clic lancia la ricerca, a download finito la voce si toglie. Ogni voce è una
+  cartellina vuota su pCloud in `music/.musicx/da cercare` (la libreria salta le cartelle col punto),
+  così si legge con l'API da ogni dispositivo, sempre aggiornata (`src/lib/wishlist.ts`).
 - **Preferiti (★)**: sul Mac la stella sta nella riga del brano (compare passandoci sopra; piena
   resta sempre) e nel lettore: un clic la mette, un altro la toglie. Sul telefono si mette dal ⋯
   del brano. La voce "Preferiti" del menu principale li elenca dall'ultimo e li fa suonare (anche in

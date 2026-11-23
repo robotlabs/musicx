@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cycleRepeat, next, playerStore, previous, progressStore, seek, toggle, toggleShuffle } from '../lib/player'
 import { libraryStore } from '../lib/library'
 import { playlistsStore } from '../lib/playlists'
@@ -8,6 +8,7 @@ import { dragTracks } from './drag'
 import { Icon } from './icons'
 import { goToSource, sourceLabel, sourceOf } from './play'
 import { StarButton } from './star'
+import { onBack } from './back'
 import { clock } from './text'
 
 /** Barra di avanzamento. Mentre la si trascina mostra il valore scelto e salta solo al rilascio. */
@@ -54,6 +55,8 @@ export function PlayerBar() {
   const player = useStore(playerStore)
   // Sul telefono la barra è compatta; toccando il titolo si apre con tutti i comandi.
   const [expanded, setExpanded] = useState(false)
+  // Aperto, il tasto indietro di Android lo richiude.
+  useEffect(() => (expanded ? onBack(() => setExpanded(false)) : undefined), [expanded])
   const item = player.items[player.index]
   // Il nome di cartelle e playlist arriva con la libreria e le playlist: quando cambiano si ridisegna.
   useStore(libraryStore, (state) => state.library)
