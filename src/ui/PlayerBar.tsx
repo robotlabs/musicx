@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { castStore } from '../lib/cast/remote'
 import { cycleRepeat, next, playerStore, previous, progressStore, seek, toggle, toggleShuffle } from '../lib/player'
 import { libraryStore } from '../lib/library'
 import { playlistsStore } from '../lib/playlists'
 import { useStore } from '../lib/store'
 import { openTrackMenu } from './actions'
+import { canCast, castLabel, openCastSheet, useCastErrors } from './cast'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
 import { goToSource, sourceLabel, sourceOf } from './play'
@@ -61,8 +63,11 @@ export function PlayerBar() {
   // Il nome di cartelle e playlist arriva con la libreria e le playlist: quando cambiano si ridisegna.
   useStore(libraryStore, (state) => state.library)
   useStore(playlistsStore, (state) => state.lists)
+  const castTarget = useStore(castStore, (state) => state.target)
+  useCastErrors()
   const source = sourceOf(player)
   if (!item) return null
+  const castName = castTarget && castLabel(castTarget)
 
   return (
     <section className={`player${expanded ? ' expanded' : ''}`} aria-label="Lettore">
@@ -80,6 +85,8 @@ export function PlayerBar() {
         >
           <span className="now-title">{item.title}</span>
           <span className={`now-sub${player.error ? ' error' : ''}`}>
+            {/* Mentre trasmette, prima di tutto dove suona. */}
+            {castName && !player.error && <span className="now-cast">{castName} · </span>}
             {player.error ?? (player.loading && player.playing ? 'Carico…' : item.sub)}
           </span>
         </button>
@@ -132,6 +139,17 @@ export function PlayerBar() {
           <Icon name="repeat" size={18} />
           {player.repeat === 'one' && <span className="badge">1</span>}
         </button>
+        {canCast() && (
+          // Sulla barra compatta del telefono si vede solo mentre trasmette.
+          <button
+            className={`icon-button${castTarget ? ' on' : ' extra'}`}
+            aria-label={castName ? `In riproduzione su ${castName}` : 'Trasmetti a una cassa'}
+            title={castName ? `In riproduzione su ${castName}` : 'Trasmetti a una cassa'}
+            onClick={openCastSheet}
+          >
+            <Icon name="speaker" size={18} />
+          </button>
+        )}
       </div>
       <Seek />
     </section>

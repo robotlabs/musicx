@@ -3,6 +3,8 @@
 
 import { setDirectLinks } from './audioStore'
 import { setMemoryAuth } from './auth'
+import { setCastBackend } from './cast/backend'
+import { fakeCastBackend } from './cast/fakeCast'
 import { readTags, writeTags } from './id3'
 import { setNamespace } from './env'
 import { setLocalSourceEnabled } from './localSource'
@@ -328,6 +330,8 @@ export function installFake(trackSeconds = 6, signedIn = true) {
   setMemoryAuth(signedIn ? { token: 'fake', host: 'eapi.pcloud.com', kind: 'session' } : null)
   installFakeLogin()
   exposeRemote()
+  // "Trasmetti" verso due casse finte.
+  setCastBackend(fakeCastBackend(trackSeconds).backend)
   setTransport(async (method, params, _timeout, file) => {
     await new Promise((resolve) => setTimeout(resolve, 120))
     switch (method) {

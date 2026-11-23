@@ -147,6 +147,21 @@ cd android && ./gradlew installDebug
   A schermo spento e con i tasti multimediali funziona grazie alla Media Session di Chrome.
   Il ⋯ accanto al brano che suona apre il suo menu (aggiungi a playlist, vai alla cartella,
   modifica info); sul Mac il brano si trascina dalla barra in basso su una playlist.
+- **Trasmetti** (icona della cassa nel lettore; Mac col servizio di musicx e app Android): come
+  Spotify Connect, il brano lo suona una cassa di casa (DLNA/UPnP, pensato per le Yamaha
+  MusicCast). La cassa prende il file da sola da pCloud e il Mac o il telefono fanno solo da
+  telecomando: play, pausa, salto, volume di ogni stanza. Il brano dopo si prepara sulla cassa
+  (`SetNextAVTransportURI`), così passa al successivo anche a telefono spento. Con le MusicCast si
+  spuntano altre stanze ("Anche qui"): si collegano alla cassa che suona con il collegamento
+  MusicCast (l'ingresso AirPlay invece non si condivide). Due cose scoperte provando le casse di casa:
+  il loro DLNA non risolve i nomi e non segue i rimandi, quindi il link pCloud va dato come
+  `http://<IP del server>/…` (lo risolve chi comanda); e la cassa chiude la connessione dopo ogni
+  risposta (`Connection: close`). Il link pCloud vale per l'IP pubblico che lo chiede: Mac, telefono
+  e casse escono dallo stesso. Sul Mac passa tutto dal servizio locale (`helper/cast.mjs`: cerca le
+  casse con SSDP e con l'API Yamaha sulla rete /24, fa le richieste in rete locale, chiede il link);
+  nell'app Android da `CapacitorHttp` e dal plugin `MusicCastPlugin.java` (ricerca e IP). Se la cassa
+  passa ad altro (Spotify, spenta) la musica torna in pausa qui. Codice in `src/lib/cast/`; con
+  `?fake` ci sono due casse finte.
 
 ## Servizio YouTube sul Mac
 
@@ -162,6 +177,11 @@ brew install yt-dlp ffmpeg
 una volta il permesso per il portachiavi). Quando YouTube cambia qualcosa basta `brew upgrade yt-dlp`.
 Per provare l'app senza scaricare niente: `MUSICX_HELPER_FAKE_DOWNLOAD=1 node helper/youtube-helper.mjs`
 (al posto del brano, qualche secondo di tono; ricerca e catalogo restano veri).
+Lo stesso servizio fa da ponte per "Trasmetti". Dopo un aggiornamento del file va riavviato
+(`launchctl kickstart -k gui/$(id -u)/com.roberto.musicx-helper`); finché gira la versione vecchia il
+pannello lo dice. Una copia nuova si prova accanto a quella installata con
+`MUSICX_HELPER_DEV=1 node helper/youtube-helper.mjs` (prende la prima porta libera; la pagina usa
+quella che sa trasmettere).
 
 ## Sviluppo
 

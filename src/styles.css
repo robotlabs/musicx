@@ -1808,3 +1808,79 @@ code.block {
 .wish-section .dim {
   margin: 0 0 6px;
 }
+
+/* ---------- Trasmetti ---------- */
+
+.now-cast {
+  color: var(--accent);
+}
+
+.menu button.on {
+  color: var(--accent);
+}
+
+.cast-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cast-row > button {
+  flex: 1;
+  min-width: 0;
+}
+
+.cast-list button span small {
+  display: block;
+  font-size: 12px;
+}
+
+.cast-link {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.cast-link:hover {
+  background: var(--raised);
+}
+
+.cast-link input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.cast-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 10px 48px;
+  color: var(--dim);
+}
+
+.cast-volume input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.cast-searching {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cast-actions {
+  padding: 8px 6px 4px;
+}

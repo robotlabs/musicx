@@ -1,10 +1,14 @@
 // Il lettore: un solo elemento <audio>, la coda, i comandi di sistema (Media Session).
 // La Media Session è ciò che fa continuare la musica a schermo spento su Android e
 // collega i tasti multimediali e il lock screen.
+// Con "Trasmetti" il brano lo suona una cassa di casa (cast/remote.ts): la coda resta qui, l'elemento
+// <audio> sta fermo e i comandi vanno alla cassa.
 
 import { MediaSession as NativeSession } from '@capgo/capacitor-media-session'
 import { NATIVE_EXT } from '../config'
 import { canSave, discardBroken, playableUrl, savedOf, saveTrack, trimCache } from './audioStore'
+import { CAST_EXT, mimeOf } from './cast/dlna'
+import { castStore, remote, type CastTarget, type Track } from './cast/remote'
 import { storageKey } from './env'
 import { extensionOf } from './library'
 import { forgetLocalSource, isLocalUrl, isRefererError, localUrl, whyNotPlayable } from './localSource'
@@ -97,6 +101,7 @@ async function load(options: { autoplay: boolean; at?: number; stage?: Stage }) 
   patch({ playing: options.autoplay, loading: true })
   progressStore.set({ position: resumeAt, duration: 0 })
   showMetadata(item)
+  if (remote.active) return loadRemote(sequence, item, options)
 
   try {
     // Scaricato o precaricato: parte subito e anche senza rete.
@@ -127,6 +132,7 @@ async function load(options: { autoplay: boolean; at?: number; stage?: Stage }) 
 function unload() {
   loadSequence += 1
   switching = false
+  if (remote.active) void remote.stopPlayback()
   audio.removeAttribute('src')
   audio.load()
   patch({ playing: false, loading: false })
@@ -239,33 +245,47 @@ function syncProgress() {
   })
 }
 
-audio.addEventListener('loadedmetadata', () => {
+/** Gli eventi dell'elemento audio contano solo quando suona lui (non mentre si trasmette). */
+function onAudio(type: keyof HTMLMediaElementEventMap, listener: () => void) {
+  audio.addEventListener(type, () => {
+    if (!remote.active) listener()
+  })
+}
+
+onAudio('loadedmetadata', () => {
   if (resumeAt > 0 && Number.isFinite(audio.duration)) {
     audio.currentTime = Math.min(resumeAt, Math.max(audio.duration - 1, 0))
   }
   resumeAt = 0
 })
-audio.addEventListener('durationchange', syncProgress)
-audio.addEventListener('timeupdate', syncProgress)
-audio.addEventListener('seeked', showPosition)
-audio.addEventListener('waiting', () => patch({ loading: true }))
-audio.addEventListener('canplay', () => {
+onAudio('durationchange', syncProgress)
+onAudio('timeupdate', syncProgress)
+onAudio('seeked', showPosition)
+onAudio('waiting', () => patch({ loading: true }))
+onAudio('canplay', () => {
   switching = false
   patch({ loading: false })
 })
-audio.addEventListener('playing', () => {
+onAudio('playing', () => {
   switching = false
   failures = 0
   patch({ playing: true, loading: false, error: null })
   showPosition()
   preloadNext()
 })
-audio.addEventListener('play', () => patch({ playing: true }))
-audio.addEventListener('pause', () => {
+onAudio('play', () => patch({ playing: true }))
+onAudio('pause', () => {
   // Pausa arrivata da fuori (cuffie staccate, notifica di sistema). Durante un cambio brano non conta.
   if (!audio.ended && !switching) patch({ playing: false })
 })
-audio.addEventListener('ended', () => {
+onAudio('ended', onTrackEnd)
+onAudio('error', () => {
+  if (!audio.error || audio.error.code === MediaError.MEDIA_ERR_ABORTED) return
+  onMediaError(mediaErrorMessage())
+})
+
+/** Brano finito: si passa al successivo, se c'è. */
+function onTrackEnd() {
   const next = nextIndex(playerStore.get(), true)
   if (next === null) {
     patch({ playing: false })
@@ -273,11 +293,190 @@ audio.addEventListener('ended', () => {
   }
   patch({ index: next })
   void load({ autoplay: true })
+}
+
+/** Dove è arrivato il brano corrente, che suoni qui o sulla cassa. */
+const currentPosition = () => (remote.active ? progressStore.get().position : audio.currentTime)
+
+// --- Trasmetti ---
+
+/** Durate già lette (la cassa spesso non la dice): servono alla barra e per capire quando un brano è finito. */
+const durations = new Map<number, number>()
+
+const castTranscodes = (item: QItem) => !CAST_EXT.has(extensionOf(item.file))
+
+async function castTrack(item: QItem, transcode: boolean): Promise<Track> {
+  return {
+    id: item.id,
+    url: await remote.link(item.id, transcode),
+    meta: {
+      title: item.title,
+      artist: item.sub,
+      mime: transcode ? 'audio/mpeg' : mimeOf(extensionOf(item.file)),
+      duration: durations.get(item.id),
+    },
+  }
+}
+
+async function loadRemote(sequence: number, item: QItem, options: { autoplay: boolean; at?: number }) {
+  switching = false
+  transcoding = stage === 2 || castTranscodes(item)
+  try {
+    const track = await castTrack(item, transcoding)
+    if (sequence !== loadSequence) return
+    await remote.load(track, { at: options.at ?? 0, autoplay: options.autoplay })
+    if (sequence !== loadSequence) return
+    // In pausa non c'è altro da aspettare; altrimenti "Carico…" finché la cassa non parte.
+    if (!options.autoplay) patch({ loading: false })
+    void probeDuration(item)
+  } catch (error) {
+    if (sequence !== loadSequence || !remote.active) return
+    onRemoteError(error instanceof Error ? error.message : String(error))
+  }
+}
+
+/** La cassa non ha suonato il brano: link nuovo, poi l'mp3 di pCloud, poi il successivo. */
+function onRemoteError(message: string) {
+  const item = currentItem()
+  if (!item) return
+  remote.forgetLink(item.id, transcoding)
+  const at = progressStore.get().position
+  const autoplay = playerStore.get().playing
+  if (stage === 0) return void load({ autoplay, at, stage: 1 })
+  if (stage === 1 && !transcoding) return void load({ autoplay, at, stage: 2 })
+  giveUp(message)
+}
+
+/** Legge la durata del brano dal file (le prime decine di KB), senza suonarlo. */
+async function probeDuration(item: QItem) {
+  let duration = durations.get(item.id) ?? 0
+  if (!duration) {
+    try {
+      const transcode = needsTranscode(item)
+      const url = (transcode ? null : await playableUrl(item.id)) ?? (await resolveLink(item, transcode))
+      duration = await new Promise<number>((resolve) => {
+        const probe = new Audio()
+        probe.preload = 'metadata'
+        probe.muted = true
+        const done = (value: number) => {
+          clearTimeout(timer)
+          probe.removeAttribute('src')
+          probe.load()
+          resolve(Number.isFinite(value) ? value : 0)
+        }
+        const timer = setTimeout(() => done(0), 20_000)
+        probe.addEventListener('loadedmetadata', () => done(probe.duration), { once: true })
+        probe.addEventListener('error', () => done(0), { once: true })
+        probe.src = url
+      })
+    } catch {
+      return
+    }
+    if (!duration) return
+    durations.set(item.id, duration)
+    if (durations.size > 1000) durations.delete(durations.keys().next().value!)
+  }
+  if (!remote.active || currentItem()?.id !== item.id) return
+  if (!remote.durationHint) remote.durationHint = duration
+  progressStore.set((progress) => ({ ...progress, duration: progress.duration || duration }))
+}
+
+let nextRun = 0
+let nextTimer = 0
+
+/** Prepara sulla cassa il brano che viene dopo, così ci passa da sola (anche a telefono spento). */
+function syncNext() {
+  clearTimeout(nextTimer)
+  nextTimer = window.setTimeout(() => {
+    if (!remote.active || !remote.loaded) return
+    const next = upcoming(1)[0] ?? null
+    if ((next?.id ?? null) === remote.nextId) return
+    const run = ++nextRun
+    void (async () => {
+      try {
+        const track = next ? await castTrack(next, castTranscodes(next)) : null
+        if (run === nextRun && remote.active) await remote.setNext(track)
+      } catch {
+        // Niente di preparato: a fine brano il successivo lo manda il lettore.
+      }
+    })()
+  }, 300)
+}
+
+/** La cassa è passata da sola al brano preparato. */
+function advanceTo(id: number) {
+  const state = playerStore.get()
+  let index = nextIndex(state, true)
+  if (index === null || state.items[index]?.id !== id) index = state.items.findIndex((item) => item.id === id)
+  if (index === null || index < 0) return
+  const item = state.items[index]
+  loadSequence += 1
+  stage = 0
+  transcoding = castTranscodes(item)
+  failures = 0
+  patch({ index, playing: true, loading: false, error: null })
+  progressStore.set({ position: 0, duration: durations.get(id) ?? 0 })
+  showMetadata(item)
+  void probeDuration(item)
+  syncNext()
+}
+
+let lastRemoteSave = 0
+
+remote.events = {
+  playing() {
+    failures = 0
+    patch({ playing: true, loading: false, error: null })
+    syncNext()
+  },
+  progress(position, duration) {
+    progressStore.set((progress) => ({
+      position,
+      duration: duration || progress.duration || remote.durationHint,
+    }))
+    showPosition()
+    if (Date.now() - lastRemoteSave > 5000) {
+      lastRemoteSave = Date.now()
+      save()
+    }
+  },
+  advanced: advanceTo,
+  ended: onTrackEnd,
+  failed: onRemoteError,
+  paused: () => patch({ playing: false }),
+  resumed: () => patch({ playing: true, loading: false }),
+  lost: () => patch({ playing: false, loading: false }),
+}
+
+// Cambia la coda (aggiunti, tolti, casuale): il brano preparato sulla cassa va rifatto.
+playerStore.subscribe(() => {
+  if (remote.active) syncNext()
 })
-audio.addEventListener('error', () => {
-  if (!audio.error || audio.error.code === MediaError.MEDIA_ERR_ABORTED) return
-  onMediaError(mediaErrorMessage())
-})
+
+/**
+ * Sposta la musica su una cassa, dal punto in cui è (`null`: di nuovo su questo dispositivo).
+ * Se la cassa è la stessa cambiano solo le stanze collegate.
+ */
+export async function castTo(target: CastTarget | null) {
+  const current = castStore.get().target
+  if (target && current && target.device.ip === current.device.ip) return remote.setRooms(target.rooms)
+  const wasPlaying = playerStore.get().playing
+  const at = currentPosition() || progressStore.get().position
+  if (remote.active) await remote.disconnect()
+  if (target) {
+    // Qui si ferma; la musica riparte sulla cassa.
+    loadSequence += 1
+    switching = false
+    audio.pause()
+    audio.removeAttribute('src')
+    audio.load()
+    await remote.connect(target)
+  }
+  if (!currentItem()) return
+  failures = 0
+  patch({ error: null })
+  void load({ autoplay: wasPlaying, at })
+}
 
 // --- Media Session ---
 // Nel browser la gestisce Chrome. Nell'app Android la fa il plugin nativo, che mostra i comandi
@@ -294,11 +493,12 @@ function showMetadata(item: QItem) {
 }
 
 function showPosition() {
-  if (!Number.isFinite(audio.duration) || audio.duration <= 0) return
+  const { position, duration } = remote.active ? progressStore.get() : { position: audio.currentTime, duration: audio.duration }
+  if (!Number.isFinite(duration) || duration <= 0) return
   const state = {
-    duration: audio.duration,
-    position: Math.min(audio.currentTime, audio.duration),
-    playbackRate: audio.playbackRate,
+    duration,
+    position: Math.min(position, duration),
+    playbackRate: remote.active ? 1 : audio.playbackRate,
   }
   if (isNativeApp) return void NativeSession.setPositionState(state).catch(() => {})
   if (!hasWebSession()) return
@@ -319,8 +519,8 @@ function bindMediaSession() {
     ['previoustrack', () => previous()],
     ['nexttrack', () => next()],
     ['seekto', (details) => typeof details.seekTime === 'number' && seek(details.seekTime)],
-    ['seekbackward', (details) => seek(audio.currentTime - (details.seekOffset ?? 10))],
-    ['seekforward', (details) => seek(audio.currentTime + (details.seekOffset ?? 10))],
+    ['seekbackward', (details) => seek(currentPosition() - (details.seekOffset ?? 10))],
+    ['seekforward', (details) => seek(currentPosition() + (details.seekOffset ?? 10))],
   ]
   if (!isNativeApp) {
     if (!hasWebSession()) return
@@ -361,17 +561,19 @@ function bindMediaSession() {
 function resume() {
   if (!currentItem()) return
   // Niente di caricato (ripresa dopo il riavvio) o ultimo tentativo fallito: si ricarica da capo.
-  if (!audio.src || playerStore.get().error) {
+  if (!(remote.active ? remote.loaded : audio.src) || playerStore.get().error) {
     failures = 0
     patch({ error: null })
     return void load({ autoplay: true, at: progressStore.get().position })
   }
   patch({ playing: true })
-  audio.play().catch(() => patch({ playing: false }))
+  if (remote.active) remote.play().catch(() => patch({ playing: false }))
+  else audio.play().catch(() => patch({ playing: false }))
 }
 
 function pause() {
-  audio.pause()
+  if (remote.active) void remote.pause()
+  else audio.pause()
   patch({ playing: false })
 }
 
@@ -421,13 +623,18 @@ export function next() {
 
 export function previous() {
   const index = previousIndex(playerStore.get())
-  if (audio.currentTime > 3 || index === null) seek(0)
+  if (currentPosition() > 3 || index === null) seek(0)
   else jumpTo(index)
 }
 
 export function seek(seconds: number) {
   const position = Math.max(0, seconds)
-  if (audio.src && Number.isFinite(audio.duration)) audio.currentTime = Math.min(position, audio.duration)
+  if (remote.active) {
+    const { duration } = progressStore.get()
+    const target = duration ? Math.min(position, duration - 1) : position
+    progressStore.set((progress) => ({ ...progress, position: target }))
+    void remote.seek(target)
+  } else if (audio.src && Number.isFinite(audio.duration)) audio.currentTime = Math.min(position, audio.duration)
   else progressStore.set((progress) => ({ ...progress, position }))
 }
 
@@ -519,6 +726,7 @@ export function initPlayer() {
 
 /** All'uscita dall'account: ferma tutto e dimentica la coda. */
 export function resetPlayer() {
+  void remote.disconnect()
   clearQueue()
   links.clear()
   localStorage.removeItem(storageKey('player'))

@@ -16,6 +16,8 @@ export interface HelperInfo {
   ytdlp: string | null
   ffmpeg: boolean
   cookies: string | null
+  /** Sa fare da ponte verso le casse ("Trasmetti"): le versioni vecchie no. */
+  cast: boolean
 }
 
 let found: HelperInfo | null = null
@@ -41,15 +43,19 @@ export async function findHelper(): Promise<HelperInfo | null> {
       }
     }),
   )
-  found = answers.find((answer) => answer !== null) ?? null
+  // Se ne rispondono due (una copia nuova in prova accanto a quella installata) vince quella che trasmette.
+  found = answers.find((answer) => answer?.cast) ?? answers.find((answer) => answer !== null) ?? null
   return found
 }
+
+/** Il servizio sul Mac: l'ultimo trovato, o lo cerca. */
+export const helperBase = async () => (found ?? (await findHelper()))?.base ?? null
 
 async function health(base: string): Promise<Omit<HelperInfo, 'base'>> {
   const response = await fetch(`${base}/health`, { signal: AbortSignal.timeout(2500) })
   const data = (await response.json()) as { app?: string } & Omit<HelperInfo, 'base'>
   if (data.app !== 'musicx-helper') throw new Error('non è il servizio di musicx')
-  return { ytdlp: data.ytdlp ?? null, ffmpeg: !!data.ffmpeg, cookies: data.cookies ?? null }
+  return { ytdlp: data.ytdlp ?? null, ffmpeg: !!data.ffmpeg, cookies: data.cookies ?? null, cast: !!data.cast }
 }
 
 async function ask<T>(path: string, init?: RequestInit): Promise<T> {

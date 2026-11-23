@@ -2,10 +2,12 @@
 // Servizio locale di musicx sul Mac per "Da YouTube": cerca un brano su YouTube, ne scarica l'audio,
 // lo converte in mp3 con tag e copertina e lo dà alla pagina, che poi lo carica su pCloud.
 // Usa yt-dlp e ffmpeg (Homebrew). Nessuna dipendenza npm: si lancia con node e basta.
+// Fa anche da ponte per "Trasmetti" verso le casse di casa (cast.mjs, percorsi /cast/...).
 //
 // Ascolta solo su 127.0.0.1. Porta preferita 8621; se è occupata da un'altra copia di questo servizio
 // esce senza fare niente (c'è già), se è occupata da altro prova le successive fino alla 8630. La
-// pagina lo trova provando quelle porte (GET /health).
+// pagina lo trova provando quelle porte (GET /health). Con MUSICX_HELPER_DEV=1 (per provare una copia
+// nuova accanto a quella installata) non esce: prende la prima porta libera.
 //
 // Risponde solo al sito di musicx e allo sviluppo in locale (Origin), così un'altra pagina web non
 // può usarlo.
@@ -17,8 +19,10 @@ import { mkdir, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { castLink, discover, lanHttp } from './cast.mjs'
 
-const VERSION = 1
+const VERSION = 2
+const DEV = process.env.MUSICX_HELPER_DEV === '1'
 const FIRST_PORT = 8621
 const LAST_PORT = 8630
 const WORK = join(tmpdir(), 'musicx-helper')
@@ -214,7 +218,12 @@ async function handle(request, response) {
     return response.end()
   }
   if (url.pathname === '/health') {
-    return send(response, 200, { app: 'musicx-helper', version: VERSION, ...versions, cookies: COOKIES, fake: FAKE_DOWNLOAD }, cors)
+    return send(
+      response,
+      200,
+      { app: 'musicx-helper', version: VERSION, ...versions, cookies: COOKIES, fake: FAKE_DOWNLOAD, cast: true },
+      cors,
+    )
   }
   // Tutto il resto solo dalle pagine di musicx (o senza Origin, dal Terminale).
   if (origin && !allowedOrigin(origin)) return send(response, 403, { error: 'Origine non ammessa.' })
@@ -225,6 +234,20 @@ async function handle(request, response) {
     }
     if (request.method === 'GET' && url.pathname === '/lookup') {
       return send(response, 200, { results: await lookup(url.searchParams.get('q') ?? '') }, cors)
+    }
+    // --- Trasmetti ---
+    if (request.method === 'GET' && url.pathname === '/cast/discover') {
+      return send(response, 200, { devices: await discover() }, cors)
+    }
+    if (request.method === 'POST' && url.pathname === '/cast/http') {
+      return send(response, 200, await lanHttp(await readJson(request)), cors)
+    }
+    if (request.method === 'POST' && url.pathname === '/cast/link') {
+      try {
+        return send(response, 200, await castLink(await readJson(request)), cors)
+      } catch (error) {
+        return send(response, 502, { error: error.message, code: error.code ?? null }, cors)
+      }
     }
     if (request.method === 'POST' && url.pathname === '/jobs') {
       const job = startJob(await readJson(request))
@@ -288,7 +311,7 @@ async function main() {
       return
     } catch (error) {
       if (error.code !== 'EADDRINUSE') throw error
-      if (await ours(port)) {
+      if (!DEV && (await ours(port))) {
         log(`musicx-helper è già in ascolto su http://127.0.0.1:${port}: esco.`)
         process.exit(0)
       }
