@@ -100,21 +100,26 @@ function CastSheet() {
   }
 
   const here = isNativeApp ? 'Questo telefono' : 'Questo Mac'
+  // "Qui" è l'uscita del dispositivo: altoparlante, cuffie o la cassa Bluetooth collegata.
+  const hereSub = isNativeApp ? 'Altoparlante, cuffie o Bluetooth' : 'Altoparlanti, cuffie, Bluetooth o AirPlay del Mac'
   const sub = target
     ? `${status === 'connecting' ? 'Collego' : 'In riproduzione su'} ${castLabel(target)}`
-    : 'Scegli dove suona musicx'
+    : 'Qui o sulle casse di casa'
 
   return (
     <div className="cast-sheet">
       <header className="sheet-head">
-        <div className="sheet-title">Trasmetti</div>
+        <div className="sheet-title">Dove suona</div>
         <div className="sheet-sub">{sub}</div>
       </header>
       <ul className="menu cast-list">
         <li>
           <button className={target ? '' : 'on'} onClick={() => choose(null)}>
             <Icon name={isNativeApp ? 'phone' : 'laptop'} />
-            <span>{here}</span>
+            <span>
+              {here}
+              <small>{hereSub}</small>
+            </span>
             {busy === 'here' ? <span className="spinner small" /> : !target && <Icon name="check" />}
           </button>
         </li>

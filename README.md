@@ -147,9 +147,10 @@ cd android && ./gradlew installDebug
   A schermo spento e con i tasti multimediali funziona grazie alla Media Session di Chrome.
   Il ⋯ accanto al brano che suona apre il suo menu (aggiungi a playlist, vai alla cartella,
   modifica info); sul Mac il brano si trascina dalla barra in basso su una playlist.
-- **Trasmetti** (icona della cassa nel lettore; Mac col servizio di musicx e app Android): come
-  Spotify Connect, il brano lo suona una cassa di casa (DLNA/UPnP, pensato per le Yamaha
-  MusicCast). La cassa prende il file da sola da pCloud e il Mac o il telefono fanno solo da
+- **Dove suona / Trasmetti** (icona della cassa nel lettore, sempre in vista; Mac col servizio di
+  musicx e app Android): si sceglie se la musica esce da qui (altoparlante, cuffie o cassa Bluetooth
+  collegata al Mac o al telefono) o da una cassa di casa. Come Spotify Connect, in quel caso il brano
+  lo suona la cassa (DLNA/UPnP, pensato per le Yamaha MusicCast). La cassa prende il file da sola da pCloud e il Mac o il telefono fanno solo da
   telecomando: play, pausa, salto, volume di ogni stanza. Il brano dopo si prepara sulla cassa
   (`SetNextAVTransportURI`), così passa al successivo anche a telefono spento. Con le MusicCast si
   spuntano altre stanze ("Anche qui"): si collegano alla cassa che suona con il collegamento

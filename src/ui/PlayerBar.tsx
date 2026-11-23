@@ -140,11 +140,11 @@ export function PlayerBar() {
           {player.repeat === 'one' && <span className="badge">1</span>}
         </button>
         {canCast() && (
-          // Sulla barra compatta del telefono si vede solo mentre trasmette.
+          // Dove suona: qui (altoparlante o Bluetooth) o su una cassa di casa. Sempre in vista, anche sul telefono.
           <button
-            className={`icon-button${castTarget ? ' on' : ' extra'}`}
-            aria-label={castName ? `In riproduzione su ${castName}` : 'Trasmetti a una cassa'}
-            title={castName ? `In riproduzione su ${castName}` : 'Trasmetti a una cassa'}
+            className={`icon-button${castTarget ? ' on' : ''}`}
+            aria-label={castName ? `In riproduzione su ${castName}` : 'Scegli dove suona'}
+            title={castName ? `In riproduzione su ${castName}` : 'Scegli dove suona (qui o sulle casse)'}
             onClick={openCastSheet}
           >
             <Icon name="speaker" size={18} />
