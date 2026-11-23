@@ -2,6 +2,7 @@
 // in "Da YouTube" e un clic lancia la ricerca (src/lib/wishlist.ts).
 
 import { useEffect, useState, type FormEvent } from 'react'
+import { libraryStore } from '../lib/library'
 import { useStore } from '../lib/store'
 import { addWish, loadWishes, removeWish, restoreWishes, wishStore, type Wish } from '../lib/wishlist'
 import { Icon } from './icons'
@@ -9,12 +10,16 @@ import { Notice } from './parts'
 import { toast } from './sheets'
 import { errorText } from './text'
 
-/** Legge la lista all'apertura (prima la copia sul dispositivo, poi pCloud). */
+/**
+ * Legge la lista all'apertura (prima la copia sul dispositivo, poi pCloud). Da pCloud solo con la
+ * libreria pronta, che dice dov'è la cartella: ricaricando l'app su questa pagina arriva dopo.
+ */
 export function useWishes() {
+  const root = useStore(libraryStore, (state) => state.library?.rootId)
+  useEffect(() => restoreWishes(), [])
   useEffect(() => {
-    restoreWishes()
-    void loadWishes()
-  }, [])
+    if (root !== undefined) void loadWishes()
+  }, [root])
   return useStore(wishStore)
 }
 

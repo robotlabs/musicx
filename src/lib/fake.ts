@@ -233,6 +233,13 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
   uploaded.set(job.fileid!, new TextEncoder().encode(JSON.stringify({ playlists: [{ name: 'Da iTunes', files: ids.slice(0, 3) }, { name: 'Vuota', files: [999999] }] })))
 }
 
+// Con ?fake&wishes c'è già qualcosa in "Da cercare" (come scritto dal telefono).
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('wishes')) {
+  const wishes = folder('.musicx', [folder('da cercare', [folder('my old haunts', []), folder('50 mila', [])])])
+  wishes.parentfolderid = tree.folderid
+  tree.contents!.push(wishes)
+}
+
 /**
  * Per scaricare un mp3 (e riscriverne i tag) serve un mp3 vero: tag dai metadati finti più un frame
  * audio muto. Per ascoltarlo resta il WAV con la nota.
