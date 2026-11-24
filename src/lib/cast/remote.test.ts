@@ -122,6 +122,48 @@ describe('trasmissione a una cassa', () => {
     expect(log).toEqual(['playing', 'paused', 'resumed'])
   })
 
+  // La prima prova vera (WX-021): la cassa restituisce l'indirizzo con ":80" e musicx la credeva passata
+  // ad altro; dopo tre giri la lasciava suonare da sola e pausa, brano nuovo e stop non le arrivavano più.
+  it('resta comandata mentre suona: pausa, ripresa, brano nuovo e stop arrivano alla cassa', async () => {
+    const ready = setup()
+    await wait(1000)
+    const { fake, devices, log } = await ready
+    const speaker = fake.speakers.get('192.168.1.122')!
+    await remote.connect({ device: devices[1], rooms: [] })
+    const loading = remote.load(track(1), { at: 0, autoplay: true })
+    await wait(500)
+    await loading
+    await wait(10_000)
+    expect(remote.active).toBe(true)
+    expect(castStore.get()).toMatchObject({ status: 'on', error: null })
+
+    const pausing = remote.pause()
+    await wait(100)
+    await pausing
+    expect(speaker.state).toBe('PAUSED_PLAYBACK')
+    await wait(4000)
+    expect(speaker.state).toBe('PAUSED_PLAYBACK')
+
+    const playing = remote.play()
+    await wait(100)
+    await playing
+    expect(speaker.state).toBe('PLAYING')
+
+    const other = remote.load(track(3), { at: 0, autoplay: true })
+    await wait(100)
+    await other
+    expect(speaker).toMatchObject({ uri: track(3).url, state: 'PLAYING' })
+    await wait(5000)
+
+    const stopping = remote.stopPlayback()
+    await wait(100)
+    await stopping
+    expect(speaker.state).toBe('STOPPED')
+    await wait(4000)
+    expect(log).toEqual(['playing', 'playing'])
+    expect(remote.active).toBe(true)
+  })
+
   it('se sulla cassa parte altro, torna qui', async () => {
     const ready = setup()
     await wait(1000)

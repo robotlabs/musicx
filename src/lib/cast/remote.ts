@@ -8,7 +8,7 @@
 import { createStore } from '../store'
 import { castBackend, type CastBackend } from './backend'
 import type { Device } from './devices'
-import { didl, hms, seconds, soapFault, soapRequest, soapValues, type Service, type TrackMeta } from './dlna'
+import { didl, hms, sameUrl, seconds, soapFault, soapRequest, soapValues, type Service, type TrackMeta } from './dlna'
 import { linkRooms, newGroupId, roomStatus, setRoomVolume, unlinkRooms } from './musiccast'
 
 export interface CastTarget {
@@ -63,18 +63,6 @@ const END_MARGIN_S = 8
 const MAX_POLL_FAILURES = 8
 /** Ogni quanti giri si chiede alla MusicCast se sta ancora suonando musicx. */
 const INPUT_CHECK_EVERY = 5
-
-/** Stesso indirizzo anche se la cassa lo restituisce scritto diversamente (%20 o spazio). */
-function sameUrl(a: string, b: string) {
-  const plain = (url: string) => {
-    try {
-      return decodeURI(url.trim())
-    } catch {
-      return url.trim()
-    }
-  }
-  return plain(a) === plain(b)
-}
 
 class Remote {
   events: RemoteEvents | null = null

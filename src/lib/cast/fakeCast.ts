@@ -98,8 +98,14 @@ export function fakeCastBackend(trackSeconds = 6, options: { supportsNext?: bool
       case 'GetTransportInfo':
         return envelope(action, { CurrentTransportState: speaker.state, CurrentTransportStatus: 'OK', CurrentSpeed: '1' })
       case 'GetPositionInfo':
-        // Come le MusicCast vere con i link di pCloud: la durata non la sanno.
-        return envelope(action, { Track: '1', TrackDuration: '0:00:00', TrackURI: speaker.uri, RelTime: hms(position(speaker)) })
+        // Come le MusicCast vere con i link di pCloud: la durata non la sanno, e l'indirizzo lo
+        // restituiscono con la porta (http://1.2.3.4:80/…, anche se è arrivato senza).
+        return envelope(action, {
+          Track: '1',
+          TrackDuration: '0:00:00',
+          TrackURI: speaker.uri.replace(/^(http:\/\/[^/:]+)\//, '$1:80/'),
+          RelTime: hms(position(speaker)),
+        })
       case 'GetVolume':
         return envelope(action, { CurrentVolume: String(speaker.volume) })
       case 'SetVolume':

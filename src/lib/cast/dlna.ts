@@ -101,6 +101,33 @@ export function seconds(text: string | undefined): number {
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])
 }
 
+/**
+ * Stesso indirizzo anche se la cassa lo restituisce scritto in un altro modo. Le MusicCast aggiungono
+ * la porta (`http://1.2.3.4:80/…` per `http://1.2.3.4/…`); altre casse tolgono i %20 o scrivono le
+ * lettere accentate in un'altra forma Unicode.
+ */
+export function sameUrl(a: string, b: string): boolean {
+  return urlKey(a) === urlKey(b)
+}
+
+function urlKey(value: string) {
+  const decode = (part: string) => {
+    try {
+      return decodeURIComponent(part).normalize('NFC')
+    } catch {
+      return part.normalize('NFC')
+    }
+  }
+  const text = value.trim()
+  try {
+    // URL toglie da solo la porta predefinita e mette in minuscolo il nome.
+    const url = new URL(text)
+    return `${url.protocol}//${url.hostname}:${url.port}${decode(url.pathname)}${decode(url.search)}`
+  } catch {
+    return decode(text)
+  }
+}
+
 const MIME: Record<string, string> = {
   mp3: 'audio/mpeg',
   flac: 'audio/flac',

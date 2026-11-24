@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { didl, hms, parseDescription, seconds, soapFault, soapRequest, soapValues } from './dlna'
+import { didl, hms, parseDescription, sameUrl, seconds, soapFault, soapRequest, soapValues } from './dlna'
 
 // La descrizione vera della CRX-N470D di casa (accorciata).
 const YAMAHA_DESC = `<?xml version="1.0"?>
@@ -68,5 +68,18 @@ describe('DLNA', () => {
     expect(meta).toContain('<dc:title>Rock &amp; Roll</dc:title>')
     expect(meta).toContain('<upnp:artist>AC&lt;DC</upnp:artist>')
     expect(meta).toContain('<res protocolInfo="http-get:*:audio/flac:*" duration="0:04:47.000">http://1.2.3.4/a.flac</res>')
+  })
+
+  it('riconosce il proprio link anche come lo restituisce la cassa', () => {
+    const sent = 'http://45.131.244.155/cfZpAtKu/The%20NuSwing%20Experience.mp3'
+    // Così lo restituiscono le MusicCast vere (WX-021, CRX-N470D): con la porta.
+    expect(sameUrl('http://45.131.244.155:80/cfZpAtKu/The%20NuSwing%20Experience.mp3', sent)).toBe(true)
+    expect(sameUrl('http://45.131.244.155/cfZpAtKu/The NuSwing Experience.mp3', sent)).toBe(true)
+    // "ù" scritta come u + accento (%CC%80) o come lettera sola (%C3%B9).
+    expect(sameUrl('http://45.131.244.152:80/DLZ/Lamu%CC%80.mp3', 'http://45.131.244.152/DLZ/Lam%C3%B9.mp3')).toBe(true)
+    expect(sameUrl(' http://1.2.3.4/a%zz.mp3 ', 'http://1.2.3.4:80/a%zz.mp3')).toBe(true)
+    expect(sameUrl('http://45.131.244.155:80/cfZpAtKu/Altro.mp3', sent)).toBe(false)
+    expect(sameUrl('http://45.131.244.156/cfZpAtKu/The%20NuSwing%20Experience.mp3', sent)).toBe(false)
+    expect(sameUrl('http://45.131.244.155:8080/cfZpAtKu/The%20NuSwing%20Experience.mp3', sent)).toBe(false)
   })
 })
