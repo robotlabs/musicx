@@ -23,6 +23,8 @@ import { moveFolderFlow, moveFolderInto, moveTracksTo, stepsTo } from './moveTo'
 import { Notice, TrackRow } from './parts'
 import { Grip, shiftOf, useDragReorder } from './reorder'
 import { useSelection } from './selection'
+import { tagMenuItem } from './tagPicker'
+import { TagChips } from './TagsView'
 import { confirmAction, openMenu, toast } from './sheets'
 import { errorText, tracksLabel } from './text'
 
@@ -112,6 +114,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
         ...(target.id === library.rootId
           ? []
           : [
+              tagMenuItem([{ kind: 'folder', id: target.id }], target.name),
               ...folderDownloadItems(target.id, target.total),
               { label: 'Sposta in cartella…', icon: 'moveTo' as const, onSelect: () => void moveFolderFlow(target.id) },
               { label: 'Modifica info dei brani', icon: 'edit' as const, onSelect: () => editTracksInfo(tracksUnder(library, target.id)) },
@@ -144,6 +147,7 @@ function FolderContent({ library, folder }: { library: Library; folder: Folder }
           {downloaded > 0 && ` · ${downloaded === folder.total ? 'tutti scaricati' : `${downloaded} scaricati`}`}
           {saving && ` · Salvo l'ordine nei file: ${Math.min(saving.done + 1, saving.total)} di ${saving.total}…`}
         </p>
+        {!isRoot && <TagChips target={{ kind: 'folder', id: folder.id }} />}
         {folder.total > 0 && (
           <div className="head-actions">
             <button className="pill primary" onClick={() => playItems(everything(folder))}>

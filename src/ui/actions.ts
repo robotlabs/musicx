@@ -10,6 +10,7 @@ import type { QItem } from '../lib/queue'
 import { navigate } from '../lib/router'
 import { trackDownloadItems } from './downloadActions'
 import { starMenuItem } from './star'
+import { tagMenuItem } from './tagPicker'
 import { editTracksInfo } from './editInfo'
 import { moveTracksFlow } from './moveTo'
 import { choosePlaylist, confirmAction, openMenu, toast, type MenuItem } from './sheets'
@@ -52,6 +53,13 @@ const editItem = (ids: number[]): MenuItem[] => {
     { label: 'Sposta in cartella…', icon: 'moveTo', onSelect: () => void moveTracksFlow(ids) },
     { label: ids.length > 1 ? `Modifica info di ${tracksLabel(ids.length)}` : 'Modifica info', icon: 'edit', onSelect: () => editTracksInfo(ids) },
   ]
+}
+
+/** "Tag…" per brani della libreria (quelli di una playlist che stanno fuori non si ritroverebbero). */
+const tagItem = (ids: number[], title: string): MenuItem[] => {
+  const library = libraryStore.get().library
+  if (!ids.length || !ids.every((id) => library?.tracks.has(id))) return []
+  return [tagMenuItem(ids.map((id) => ({ kind: 'track' as const, id })), title)]
 }
 
 /**
@@ -139,7 +147,8 @@ export function openTrackMenu(
   const selected = options.selected
   if (selected && selected.length > 1) {
     const ids = selected.map((entry) => entry.id)
-    openMenu(`${tracksLabel(selected.length)} selezionati`, [...queueMenuItems(selected), ...trackDownloadItems(selected), ...editItem(ids), ...deleteItems(selected, options.playlist)])
+    const title = `${tracksLabel(selected.length)} selezionati`
+    openMenu(title, [...queueMenuItems(selected), ...tagItem(ids, title), ...trackDownloadItems(selected), ...editItem(ids), ...deleteItems(selected, options.playlist)])
     return
   }
   const items = [starMenuItem(item), ...queueMenuItems([item])]
@@ -147,5 +156,9 @@ export function openTrackMenu(
   if (parent != null && libraryStore.get().library?.folders.has(parent)) {
     items.push({ label: 'Vai alla cartella', icon: 'folder', onSelect: () => navigate({ name: 'folder', id: parent }) })
   }
-  openMenu(item.title, [...items, ...trackDownloadItems([item]), ...editItem([item.id]), ...(options.extra ?? []), ...deleteItems([item], options.playlist)], item.sub)
+  openMenu(
+    item.title,
+    [...items, ...tagItem([item.id], item.title), ...trackDownloadItems([item]), ...editItem([item.id]), ...(options.extra ?? []), ...deleteItems([item], options.playlist)],
+    item.sub,
+  )
 }

@@ -14,6 +14,8 @@ import { runImportJob } from './importPlaylist'
 import { startBackButton } from './back'
 import { StarredView } from './StarredView'
 import { WishlistView } from './WishlistView'
+import { TagsView, TagView } from './TagsView'
+import { loadTags, resetTags, restoreTags } from '../lib/tags'
 import { resetStarred, restoreStarred } from '../lib/starred'
 import { groupPlaylists, playlistsStore, refreshPlaylists, resetPlaylists, restorePlaylists, type Playlist } from '../lib/playlists'
 import { navigate, routeHref, routeStore, type Route } from '../lib/router'
@@ -45,6 +47,7 @@ async function logout() {
   resetPlayer()
   resetPlaylists()
   resetStarred()
+  resetTags()
   await forgetSavedMusic()
   await clearLibrary()
   await endSession()
@@ -53,7 +56,7 @@ async function logout() {
 
 async function refresh() {
   toast('Aggiorno la libreria…')
-  await Promise.all([refreshLibrary(), refreshPlaylists()])
+  await Promise.all([refreshLibrary(), refreshPlaylists(), loadTags()])
   const { library, error } = libraryStore.get()
   toast(error ?? `Libreria aggiornata: ${tracksLabel(library?.tracks.size ?? 0)}.`)
 }
@@ -144,6 +147,7 @@ const sections: { route: Route; label: string; icon: IconName; match: Route['nam
   { route: { name: 'folder', id: null }, label: 'Libreria', icon: 'music', match: ['folder', 'search'] },
   { route: { name: 'playlists' }, label: 'Playlist', icon: 'list', match: ['playlists', 'playlist'] },
   { route: { name: 'starred' }, label: 'Preferiti', icon: 'star', match: ['starred'] },
+  { route: { name: 'tags' }, label: 'Tag', icon: 'tag', match: ['tags', 'tag'] },
   { route: { name: 'queue' }, label: 'Coda', icon: 'queue', match: ['queue'] },
   // Solo sul Mac, dove c'è il servizio che scarica da YouTube.
   ...(youtubeHere()
@@ -322,7 +326,9 @@ export function Main() {
     initPlayer()
     restorePlaylists()
     restoreStarred()
-    void initLibrary().then(() => runImportJob())
+    restoreTags()
+    // I tag e il lavoro di importazione stanno sotto la cartella della musica: servono la libreria.
+    void initLibrary().then(() => Promise.all([runImportJob(), loadTags()]))
     startLiveLibrary()
     void refreshPlaylists()
     void initAudioStore().then(initDownloads)
@@ -369,6 +375,8 @@ export function Main() {
         {route.name === 'youtube' && <YouTubeView />}
         {route.name === 'starred' && <StarredView />}
         {route.name === 'wishlist' && <WishlistView />}
+        {route.name === 'tags' && <TagsView />}
+        {route.name === 'tag' && <TagView name={route.tag} key={route.tag} />}
       </main>
       <PlayerBar />
       <Tabs route={route} />

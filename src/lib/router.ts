@@ -13,6 +13,8 @@ export type Route =
   | { name: 'youtube' }
   | { name: 'starred' }
   | { name: 'wishlist' }
+  | { name: 'tags' }
+  | { name: 'tag'; tag: string }
 
 export function parseRoute(hash: string): Route {
   const [head, ...rest] = hash.replace(/^#\/?/, '').split('/')
@@ -33,6 +35,14 @@ export function parseRoute(hash: string): Route {
   if (head === 'youtube') return { name: 'youtube' }
   if (head === 'starred') return { name: 'starred' }
   if (head === 'wishlist') return { name: 'wishlist' }
+  if (head === 'tags') return { name: 'tags' }
+  if (head === 'tag' && argument) {
+    try {
+      return { name: 'tag', tag: decodeURIComponent(argument) }
+    } catch {
+      return { name: 'tags' }
+    }
+  }
   return { name: 'folder', id: null }
 }
 
@@ -58,6 +68,10 @@ export function routeHref(route: Route): string {
       return '#/starred'
     case 'wishlist':
       return '#/wishlist'
+    case 'tags':
+      return '#/tags'
+    case 'tag':
+      return `#/tag/${encodeURIComponent(route.tag)}`
   }
 }
 

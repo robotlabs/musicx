@@ -347,12 +347,30 @@ export function installFake(trackSeconds = 6, signedIn = true) {
       case 'logout':
         return { result: 0 }
       case 'listfolder': {
-        if (params.recursive) return { result: 0, metadata: tree }
+        if (params.recursive && params.folderid === undefined) return { result: 0, metadata: tree }
         const found = folderOf(params)
+        if (params.recursive) {
+          // Una cartella con tutte le sottocartelle (i tag): solo cartelle se `nofiles`.
+          const copy = (entry: RawMeta): RawMeta => ({
+            ...entry,
+            contents: entry.contents?.filter((child) => !params.nofiles || child.isfolder).map((child) => (child.isfolder ? copy(child) : { ...child })),
+          })
+          return { result: 0, metadata: copy(found) }
+        }
         const contents = found.contents!.filter((child) => !params.nofiles || child.isfolder).map((child) => ({ ...child, contents: undefined }))
         return { result: 0, metadata: { ...found, contents } }
       }
       case 'renamefolder': {
+        if (params.toname !== undefined && params.tofolderid === undefined) {
+          const renaming = folderOf(params)
+          const parent = findFolder(renaming.parentfolderid!)
+          if (parent?.contents!.some((child) => child !== renaming && child.name === String(params.toname))) {
+            throw new PCloudError(2004, 'File or folder alredy exists.')
+          }
+          renaming.name = String(params.toname)
+          emit('modifyfolder', renaming)
+          return { result: 0, metadata: { ...renaming, contents: undefined } }
+        }
         const moving = folderOf(params)
         const target = folderOf(params, 'tofolderid')
         if (findFolder(target.folderid!, moving)) throw new PCloudError(2043, 'Cannot move a folder to a subfolder of itself.')
@@ -382,6 +400,13 @@ export function installFake(trackSeconds = 6, signedIn = true) {
         if (params.tofolderid !== undefined) moveInto(meta, folderOf(params, 'tofolderid'))
         emit('modifyfile', meta)
         return { result: 0, metadata: { ...meta } }
+      }
+      case 'deletefolderrecursive': {
+        const gone = folderOf(params)
+        const from = findFolder(gone.parentfolderid!)
+        if (from) from.contents = from.contents!.filter((child) => child !== gone)
+        emit('deletefolder', gone)
+        return { result: 0, deletedfiles: 0, deletedfolders: 1 }
       }
       case 'deletefolder': {
         const gone = folderOf(params)

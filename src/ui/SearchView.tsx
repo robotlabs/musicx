@@ -5,6 +5,8 @@ import { playItems } from './play'
 import { routeHref } from '../lib/router'
 import type { QItem } from '../lib/queue'
 import { useStore } from '../lib/store'
+import { searchTags, tagStore } from '../lib/tags'
+import { TagRow } from './TagsView'
 import { openTrackMenu } from './actions'
 import { dragTracks } from './drag'
 import { Icon } from './icons'
@@ -26,15 +28,27 @@ export function SearchView({ query }: { query: string }) {
     return { ...result, items: result.tracks.map((track) => toQueueItem(library, track)) }
   }, [library, deferredQuery])
   const selection = useSelection(found?.items ?? noItems, query.trim())
+  const allTags = useStore(tagStore, (state) => state.tags)
+  const tags = useMemo(() => searchTags(allTags, deferredQuery), [allTags, deferredQuery])
 
   if (!found) return <Notice loading title="Leggo la libreria da pCloud…" />
-  if (!query.trim()) return <Notice title="Cerca nella libreria" body="Titolo, artista, album o nome della cartella." />
-  if (!found.folders.length && !found.items.length) {
+  if (!query.trim()) return <Notice title="Cerca nella libreria" body="Titolo, artista, album, nome della cartella o un tag." />
+  if (!tags.length && !found.folders.length && !found.items.length) {
     return <Notice title="Nessun risultato" body={`Niente che contenga "${query.trim()}".`} />
   }
 
   return (
     <>
+      {tags.length > 0 && (
+        <>
+          <h2 className="section">Tag</h2>
+          <ul className="rows">
+            {tags.map((tag) => (
+              <TagRow key={tag.name} tag={tag} />
+            ))}
+          </ul>
+        </>
+      )}
       {found.folders.length > 0 && (
         <>
           <h2 className="section">Cartelle</h2>

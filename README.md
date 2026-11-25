@@ -116,6 +116,13 @@ cd android && ./gradlew installDebug
   del brano. La voce "Preferiti" del menu principale li elenca dall'ultimo e li fa suonare (anche in
   ordine casuale). Sono una playlist di pCloud tutta loro, "★ Preferiti", che la pagina Playlist
   non mostra: così valgono su ogni dispositivo (`src/lib/starred.ts`).
+- **Tag**: dal ⋯ di una cartella, di una playlist, di un brano o della selezione, "Tag…" fa
+  spuntare i tag che ci sono o scriverne uno nuovo. Un tag su una cartella vale per tutta la musica
+  che contiene, anche quella aggiunta dopo. La voce "Tag" del menu principale li elenca; la pagina di
+  un tag mostra cartelle, playlist e brani e suona tutto insieme (senza doppioni). I tag escono
+  anche nella ricerca e in testa alle pagine di cartelle e playlist. Su pCloud sono cartelline vuote
+  in `music/.musicx/tag/<tag>/` (`f<id>` cartella, `p<id>` playlist, `t<id>` brano), lette con una
+  chiamata sola (`src/lib/tags.ts`).
 - **Elimina** (⋯ di un brano o della selezione): in una cartella sposta il file nel cestino di
   pCloud, dopo la conferma; in una playlist chiede "Solo da questa playlist" o "Via il file da
   pCloud" (nel cestino, e sparisce da tutte le playlist).

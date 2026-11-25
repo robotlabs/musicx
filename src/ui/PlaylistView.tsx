@@ -19,6 +19,7 @@ import { Grip, shiftOf, useDragReorder } from './reorder'
 import { useSelection } from './selection'
 import { playlistMenuItems, playlistSubtitle } from './playlistActions'
 import { openMenu, toast } from './sheets'
+import { TagChips } from './TagsView'
 import { errorText, tracksLabel } from './text'
 
 const PlaylistRow = memo(function PlaylistRow(props: {
@@ -152,6 +153,7 @@ export function PlaylistView({ id }: { id: number }) {
           {tracksLabel(tracks.length)}
           {downloaded > 0 && ` · ${downloaded === tracks.length ? 'tutti scaricati' : `${downloaded} scaricati`}`}
         </p>
+        <TagChips target={{ kind: 'playlist', id }} />
         <div className="head-actions">
           {tracks.length > 0 && (
             <>

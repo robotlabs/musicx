@@ -215,6 +215,21 @@ export async function deleteFolder(folderid: number): Promise<void> {
   await call('deletefolder', { folderid })
 }
 
+/** Manda nel cestino una cartella con tutto quello che contiene. */
+export async function deleteFolderTree(folderid: number): Promise<void> {
+  await call('deletefolderrecursive', { folderid })
+}
+
+/** Rinomina una cartella restando dov'è (stesso folderid). */
+export async function renameFolder(folderid: number, toname: string): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('renamefolder', { folderid, toname })).metadata
+}
+
+/** Tutte le sottocartelle di una cartella, a ogni livello, in una chiamata (senza i file). */
+export async function listFolderTree(folderid: number): Promise<RawMeta> {
+  return (await call<{ metadata: RawMeta }>('listfolder', { folderid, recursive: 1, nofiles: 1, noshares: 1 }, 60_000)).metadata
+}
+
 /** Crea una cartella; se ce n'è già una con quel nome restituisce quella. */
 export async function createFolder(folderid: number, name: string): Promise<RawMeta> {
   return (await call<{ metadata: RawMeta }>('createfolderifnotexists', { folderid, name })).metadata

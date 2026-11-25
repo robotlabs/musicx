@@ -1884,3 +1884,48 @@ code.block {
 .cast-actions {
   padding: 8px 6px 4px;
 }
+
+/* ---------- Tag ---------- */
+
+/* I tag in testa a una cartella o playlist: un clic porta alla pagina del tag. */
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tag-chip:hover {
+  color: var(--accent);
+}
+
+/* Pannello "Tag": cerca o scrivi in alto, spunta sotto. */
+.tag-new {
+  display: flex;
+  gap: 8px;
+  padding: 4px 6px 10px;
+}
+
+.tag-new input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}

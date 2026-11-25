@@ -3,8 +3,8 @@
 // salta le cartelle col punto): così si leggono con l'API da ogni dispositivo, sempre aggiornate, e
 // due aggiunte insieme non si pestano i piedi.
 
+import { appFolder, fromFolderName, toFolderName } from './appFolder'
 import { storageKey } from './env'
-import { libraryStore } from './library'
 import { createFolder, deleteFolder, listFolder, type RawMeta } from './pcloud'
 import { createStore } from './store'
 
@@ -25,9 +25,6 @@ export const wishStore = createStore<WishState>({ items: [], loaded: false, erro
 const PATH = ['.musicx', 'da cercare']
 const cacheKey = () => storageKey('wishes')
 
-// Nei nomi delle cartelle pCloud non vuole "/" né "\": diventano barre simili, e tornano indietro.
-const toName = (text: string) => text.replace(/\//g, '∕').replace(/\\/g, '⧵').replace(/\s+/g, ' ').trim().slice(0, 200)
-const fromName = (name: string) => name.replace(/∕/g, '/').replace(/⧵/g, '\\')
 
 function show(items: Wish[], error: string | null = null) {
   wishStore.set({ items, loaded: true, error })
@@ -49,28 +46,12 @@ export function restoreWishes() {
   }
 }
 
-/** La cartella della lista; con `create` la crea se manca, se no restituisce null. */
-async function folder(create: boolean): Promise<number | null> {
-  const root = libraryStore.get().library?.rootId
-  if (root === undefined) throw new Error('La libreria non è ancora caricata.')
-  let id = root
-  for (const name of PATH) {
-    if (create) id = (await createFolder(id, name)).folderid!
-    else {
-      const found = (await listFolder(id, true)).contents?.find((entry) => entry.isfolder && entry.name === name)
-      if (!found) return null
-      id = found.folderid!
-    }
-  }
-  return id
-}
-
-const toWish = (entry: RawMeta): Wish => ({ id: entry.folderid!, text: fromName(entry.name) })
+const toWish = (entry: RawMeta): Wish => ({ id: entry.folderid!, text: fromFolderName(entry.name) })
 const byAge = (a: RawMeta, b: RawMeta) => Date.parse(a.created ?? '') - Date.parse(b.created ?? '') || a.folderid! - b.folderid!
 
 export async function loadWishes() {
   try {
-    const id = await folder(false)
+    const id = await appFolder(PATH, false)
     const entries = id === null ? [] : ((await listFolder(id, true)).contents ?? []).filter((entry) => entry.isfolder)
     show(entries.sort(byAge).map(toWish))
   } catch (error) {
@@ -80,9 +61,9 @@ export async function loadWishes() {
 }
 
 export async function addWish(text: string) {
-  const name = toName(text)
+  const name = toFolderName(text)
   if (!name) return
-  const id = await folder(true)
+  const id = await appFolder(PATH, true)
   const made = await createFolder(id!, name)
   const items = wishStore.get().items.filter((item) => item.id !== made.folderid)
   show([...items, toWish({ ...made, name })])

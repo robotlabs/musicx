@@ -15,6 +15,7 @@ import {
 } from '../lib/playlists'
 import { navigate, routeStore } from '../lib/router'
 import { playlistDownloadItems } from './downloadActions'
+import { tagMenuItem } from './tagPicker'
 import { askText, choosePlaylists, confirmAction, createPlaylistFlow, openMenu, toast, type MenuItem } from './sheets'
 import { errorText, tracksLabel } from './text'
 
@@ -88,6 +89,7 @@ export async function deletePlaylistFlow(list: Playlist): Promise<boolean> {
 /** Voci per spostare, rinominare ed eliminare una playlist. `onDeleted` serve alla pagina della playlist. */
 export function playlistMenuItems(list: Playlist, onDeleted?: () => void): MenuItem[] {
   return [
+    tagMenuItem([{ kind: 'playlist', id: list.id }], list.title),
     ...(list.count ? playlistDownloadItems(list.id, list.count) : []),
     { label: 'Sposta in gruppo…', icon: 'folder', onSelect: () => moveToGroupMenu(list) },
     { label: 'Rinomina', icon: 'edit', onSelect: () => void renamePlaylistFlow(list) },
